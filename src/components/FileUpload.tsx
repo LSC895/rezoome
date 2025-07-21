@@ -1,6 +1,6 @@
 
 import React, { useCallback, useState } from 'react';
-import { Upload, FileText, X } from 'lucide-react';
+import { Upload, FileText, X, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface FileUploadProps {
@@ -49,13 +49,13 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect, isLoading = false
 
   if (selectedFile) {
     return (
-      <div className="floating-card p-6 text-center animate-scale-in">
-        <div className="flex items-center justify-center space-x-3 mb-4">
-          <FileText className="h-8 w-8 text-purple-600" />
+      <div className="floating-card p-8 text-center animate-scale-in">
+        <div className="flex items-center justify-center space-x-4 mb-6">
+          <FileText className="h-10 w-10 text-purple-600" />
           <div className="text-left">
-            <p className="font-sora font-semibold text-gray-900">{selectedFile.name}</p>
+            <p className="font-sora font-semibold text-gray-900 text-lg">{selectedFile.name}</p>
             <p className="text-sm text-gray-500">
-              {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+              {(selectedFile.size / 1024 / 1024).toFixed(2)} MB • Ready to roast
             </p>
           </div>
           <Button
@@ -64,16 +64,26 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect, isLoading = false
             onClick={clearFile}
             className="ml-auto text-gray-400 hover:text-gray-600"
           >
-            <X className="h-4 w-4" />
+            <X className="h-5 w-5" />
           </Button>
         </div>
         
         <Button
           onClick={() => onFileSelect(selectedFile)}
           disabled={isLoading}
-          className="w-full gradient-purple text-white font-sora font-semibold py-3 text-lg hover:opacity-90 transition-opacity"
+          size="lg"
+          className="w-full gradient-purple text-white font-sora font-bold py-4 text-lg hover:opacity-90 transition-opacity"
         >
-          {isLoading ? 'ROASTING YOUR RESUME...' : 'ROAST MY RESUME 🔥'}
+          {isLoading ? (
+            <>
+              <Sparkles className="animate-spin mr-2 h-5 w-5" />
+              ROASTING YOUR RESUME...
+            </>
+          ) : (
+            <>
+              ROAST MY RESUME 🔥
+            </>
+          )}
         </Button>
       </div>
     );
@@ -81,10 +91,10 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect, isLoading = false
 
   return (
     <div
-      className={`floating-card p-8 border-2 border-dashed transition-all duration-300 cursor-pointer ${
+      className={`floating-card p-12 border-2 border-dashed transition-all duration-300 cursor-pointer ${
         isDragOver 
-          ? 'border-purple-400 bg-purple-50' 
-          : 'border-gray-300 hover:border-purple-300'
+          ? 'border-purple-400 bg-purple-50 scale-105' 
+          : 'border-gray-300 hover:border-purple-300 hover:bg-gray-50'
       }`}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -92,16 +102,30 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect, isLoading = false
       onClick={() => document.getElementById('file-upload')?.click()}
     >
       <div className="text-center">
-        <Upload className={`h-12 w-12 mx-auto mb-4 ${isDragOver ? 'text-purple-600' : 'text-gray-400'}`} />
-        <h3 className="font-sora font-semibold text-lg text-gray-900 mb-2">
-          Drop your resume here
+        <div className={`relative mb-6 ${isDragOver ? 'animate-bounce' : ''}`}>
+          <Upload className={`h-16 w-16 mx-auto ${isDragOver ? 'text-purple-600' : 'text-gray-400'}`} />
+          {isDragOver && (
+            <div className="absolute -top-2 -right-2">
+              <Sparkles className="h-6 w-6 text-purple-600 animate-pulse" />
+            </div>
+          )}
+        </div>
+        
+        <h3 className="font-sora font-bold text-2xl text-gray-900 mb-3">
+          Drop Your Resume Here
         </h3>
-        <p className="text-gray-600 mb-4">
-          or <span className="text-purple-600 font-medium">browse files</span>
+        <p className="text-gray-600 text-lg mb-6">
+          or <span className="text-purple-600 font-semibold underline">browse files</span>
         </p>
-        <p className="text-sm text-gray-500">
-          PDF files only • Max 10MB
-        </p>
+        
+        <div className="space-y-2">
+          <p className="text-sm text-gray-500">
+            PDF files only • Max 10MB
+          </p>
+          <p className="text-xs text-purple-600 font-medium">
+            Your first roast is completely FREE!
+          </p>
+        </div>
       </div>
       
       <input
