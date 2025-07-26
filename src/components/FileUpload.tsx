@@ -1,6 +1,6 @@
 
 import React, { useCallback, useState } from 'react';
-import { Upload, FileText, X, Sparkles } from 'lucide-react';
+import { Upload, FileText, X, Sparkles, Globe } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface FileUploadProps {
@@ -11,6 +11,8 @@ interface FileUploadProps {
 const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect, isLoading = false }) => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedLanguage, setSelectedLanguage] = useState<'english' | 'hindi'>('english');
+  const [roastPersonality, setRoastPersonality] = useState<'professional' | 'memer' | 'motivational' | 'hr'>('professional');
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -31,25 +33,29 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect, isLoading = false
     
     if (file && (file.type === 'application/pdf' || file.name.endsWith('.pdf'))) {
       setSelectedFile(file);
-      onFileSelect(file);
     }
-  }, [onFileSelect]);
+  }, []);
 
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setSelectedFile(file);
-      onFileSelect(file);
     }
-  }, [onFileSelect]);
+  }, []);
 
   const clearFile = useCallback(() => {
     setSelectedFile(null);
   }, []);
 
+  const handleRoast = () => {
+    if (selectedFile) {
+      onFileSelect(selectedFile);
+    }
+  };
+
   if (selectedFile) {
     return (
-      <div className="floating-card p-8 animate-scale-in max-w-md mx-auto">
+      <div className="floating-card p-8 animate-scale-in max-w-2xl mx-auto">
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
@@ -70,9 +76,57 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect, isLoading = false
               <X className="h-5 w-5" />
             </Button>
           </div>
+
+          {/* Language Selection */}
+          <div className="space-y-3">
+            <label className="font-sora font-medium text-foreground">Choose Language</label>
+            <div className="flex space-x-3">
+              <Button
+                variant={selectedLanguage === 'english' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setSelectedLanguage('english')}
+                className="flex items-center space-x-2"
+              >
+                <Globe className="h-4 w-4" />
+                <span>English</span>
+              </Button>
+              <Button
+                variant={selectedLanguage === 'hindi' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setSelectedLanguage('hindi')}
+                className="flex items-center space-x-2"
+              >
+                <Globe className="h-4 w-4" />
+                <span>हिंदी</span>
+              </Button>
+            </div>
+          </div>
+
+          {/* Roast Personality Selection */}
+          <div className="space-y-3">
+            <label className="font-sora font-medium text-foreground">Choose Roast Style</label>
+            <div className="grid grid-cols-2 gap-2">
+              {([
+                { key: 'professional', label: 'Professional' },
+                { key: 'memer', label: 'Memer' },
+                { key: 'motivational', label: 'Motivational' },
+                { key: 'hr', label: 'HR Expert' }
+              ] as const).map(({ key, label }) => (
+                <Button
+                  key={key}
+                  variant={roastPersonality === key ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setRoastPersonality(key)}
+                  className="text-xs"
+                >
+                  {label}
+                </Button>
+              ))}
+            </div>
+          </div>
           
           <Button
-            onClick={() => onFileSelect(selectedFile)}
+            onClick={handleRoast}
             disabled={isLoading}
             size="lg"
             className="w-full gradient-purple text-white font-sora font-bold py-4 text-lg hover:opacity-90 transition-opacity rounded-2xl"
@@ -88,13 +142,17 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect, isLoading = false
               </>
             )}
           </Button>
+
+          <p className="text-center text-sm text-muted-foreground">
+            Get instant ATS score + {selectedLanguage === 'hindi' ? 'Hindi' : 'English'} roast in {roastPersonality} style
+          </p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-md mx-auto">
+    <div className="max-w-2xl mx-auto">
       <div
         className={`floating-card p-12 border-2 border-dashed transition-all duration-300 cursor-pointer ${
           isDragOver 
@@ -124,7 +182,10 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect, isLoading = false
                 PDF files only • Max 10MB
               </p>
               <p className="text-purple-600 font-semibold text-sm">
-                Your first roast is completely FREE!
+                First roast is completely FREE!
+              </p>
+              <p className="text-muted-foreground text-xs">
+                Supports English & Hindi • Multiple roast personalities
               </p>
             </div>
           </div>
