@@ -55,8 +55,8 @@ const Index = () => {
     setCurrentStep('results');
     
     toast({
-      title: "Resume roasted! 🔥",
-      description: "Your resume has been thoroughly analyzed and roasted.",
+      title: "Resume analyzed! 🔥",
+      description: "Your resume has been thoroughly analyzed.",
     });
   };
 
@@ -106,7 +106,7 @@ const Index = () => {
         </div>
       </div>
 
-      {/* Hero Section - Centered like textinbetween.in */}
+      {/* Hero Section */}
       <div className="container mx-auto px-6 py-20">
         <div className="max-w-4xl mx-auto text-center space-y-16">
           
@@ -120,17 +120,8 @@ const Index = () => {
             </h1>
             
             <p className="text-2xl text-muted-foreground font-medium max-w-3xl mx-auto">
-              Get an ATS score and a real AI-powered roast. Then instantly tailor a resume for every job.
+              Get an ATS score and AI-powered feedback. Then instantly tailor a resume for any job.
             </p>
-          </div>
-
-          {/* Stats Counter */}
-          <div className="inline-flex items-center space-x-3 bg-purple-50 rounded-2xl px-8 py-4">
-            <Trophy className="h-8 w-8 text-purple-600" />
-            <div className="text-left">
-              <div className="font-sora font-bold text-3xl text-purple-600">12,847</div>
-              <div className="text-purple-700 font-medium">Resumes Roasted</div>
-            </div>
           </div>
 
           {/* Upload Section */}
@@ -139,7 +130,7 @@ const Index = () => {
           </div>
 
           {/* Features Grid */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-4xl mx-auto pt-16">
+          <div className="grid md:grid-cols-3 gap-8 max-w-3xl mx-auto pt-16">
             <div className="text-center space-y-3">
               <Zap className="h-12 w-12 text-purple-600 mx-auto" />
               <h3 className="font-sora font-bold text-lg text-foreground">Instant ATS Score</h3>
@@ -147,61 +138,70 @@ const Index = () => {
             </div>
             <div className="text-center space-y-3">
               <Star className="h-12 w-12 text-purple-600 mx-auto" />
-              <h3 className="font-sora font-bold text-lg text-foreground">AI Roasting</h3>
-              <p className="text-muted-foreground">Multiple personalities & tones</p>
+              <h3 className="font-sora font-bold text-lg text-foreground">AI Feedback</h3>
+              <p className="text-muted-foreground">Actionable improvements</p>
             </div>
             <div className="text-center space-y-3">
               <RefreshCw className="h-12 w-12 text-purple-600 mx-auto" />
-              <h3 className="font-sora font-bold text-lg text-foreground">Job-Specific Resumes</h3>
-              <p className="text-muted-foreground">Tailored for each application</p>
-            </div>
-            <div className="text-center space-y-3">
-              <Chrome className="h-12 w-12 text-purple-600 mx-auto" />
-              <h3 className="font-sora font-bold text-lg text-foreground">Chrome Extension</h3>
-              <p className="text-muted-foreground">Generate from any job post</p>
+              <h3 className="font-sora font-bold text-lg text-foreground">Job Tailoring</h3>
+              <p className="text-muted-foreground">Customized for each role</p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Language Support */}
-      <div className="bg-muted/30 py-16">
+      {/* How It Works */}
+      <div className="bg-muted/30 py-24">
         <div className="container mx-auto px-6">
-          <div className="max-w-2xl mx-auto text-center space-y-8">
-            <div className="space-y-4">
+          <div className="max-w-4xl mx-auto">
+            <div className="text-center space-y-4 mb-16">
               <h2 className="font-sora font-bold text-4xl text-foreground">
-                English & Hindi Support
+                How It Works
               </h2>
               <p className="text-xl text-muted-foreground">
-                Get roasts and feedback in the language you prefer
+                Three simple steps to better resumes
               </p>
             </div>
 
-            <div className="flex justify-center items-center space-x-8">
-              <div className="flex items-center space-x-3">
-                <Globe className="h-8 w-8 text-purple-600" />
-                <span className="text-2xl font-sora font-bold text-foreground">English</span>
+            <div className="grid md:grid-cols-3 gap-8">
+              <div className="floating-card p-8 text-center">
+                <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <span className="text-2xl font-sora font-bold text-purple-600">1</span>
+                </div>
+                <h3 className="font-sora font-bold text-xl text-foreground mb-4">Upload Resume</h3>
+                <p className="text-muted-foreground">Get an instant ATS score and detailed feedback</p>
               </div>
-              <div className="text-muted-foreground text-3xl">+</div>
-              <div className="flex items-center space-x-3">
-                <Globe className="h-8 w-8 text-purple-600" />
-                <span className="text-2xl font-sora font-bold text-foreground">हिंदी</span>
+
+              <div className="floating-card p-8 text-center">
+                <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <span className="text-2xl font-sora font-bold text-purple-600">2</span>
+                </div>
+                <h3 className="font-sora font-bold text-xl text-foreground mb-4">Add Job Description</h3>
+                <p className="text-muted-foreground">Paste any job posting to create a tailored version</p>
+              </div>
+
+              <div className="floating-card p-8 text-center">
+                <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <span className="text-2xl font-sora font-bold text-purple-600">3</span>
+                </div>
+                <h3 className="font-sora font-bold text-xl text-foreground mb-4">Download & Apply</h3>
+                <p className="text-muted-foreground">Get your optimized resume ready for applications</p>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Pricing Section - Clean and Centered */}
+      {/* Pricing Section */}
       <div className="bg-background py-24">
         <div className="container mx-auto px-6">
           <div className="max-w-2xl mx-auto text-center space-y-12">
             <div className="space-y-4">
-              <h2 className="font-sora font-bold text-5xl text-foreground">
-                Lifetime Access for Everyone
+              <h2 className="font-sora font-bold text-4xl text-foreground">
+                Simple Pricing
               </h2>
               <p className="text-xl text-muted-foreground">
-                No subscriptions. No hidden fees. Just legendary resume feedback, instantly.
+                One-time payment, lifetime access
               </p>
             </div>
 
@@ -209,34 +209,26 @@ const Index = () => {
             <div className="floating-card p-10 max-w-lg mx-auto relative">
               <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
                 <span className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-2 rounded-full font-sora font-bold text-sm">
-                  LIFETIME DEAL
+                  LIFETIME ACCESS
                 </span>
               </div>
               
               <div className="space-y-8 pt-4">
                 <div className="space-y-4">
-                  <div className="flex items-baseline justify-center space-x-6">
-                    <div className="text-center">
-                      <div className="text-5xl font-sora font-bold text-foreground">$5</div>
-                      <div className="text-muted-foreground">USD</div>
-                    </div>
-                    <div className="text-muted-foreground text-2xl">/</div>
-                    <div className="text-center">
-                      <div className="text-5xl font-sora font-bold text-foreground">₹430</div>
-                      <div className="text-muted-foreground">INR</div>
-                    </div>
+                  <div className="text-center">
+                    <div className="text-6xl font-sora font-bold text-foreground">$9</div>
+                    <div className="text-muted-foreground text-lg">One-time payment</div>
                   </div>
-                  <p className="text-purple-600 font-semibold text-lg">One-time payment, lifetime access</p>
                 </div>
 
                 <div className="space-y-4">
                   {[
-                    "Up to 1,000 resume generations",
-                    "Job-specific resume tailoring",
+                    "Unlimited resume analysis",
+                    "Job-specific tailoring",
                     "Chrome extension access", 
-                    "All roast personalities & languages",
-                    "Resume version management",
-                    "Chat with founder anytime"
+                    "Multiple feedback styles",
+                    "PDF & DOCX downloads",
+                    "Lifetime updates"
                   ].map((feature, index) => (
                     <div key={index} className="flex items-center justify-center space-x-3">
                       <CheckCircle className="h-5 w-5 text-purple-600" />
@@ -249,54 +241,8 @@ const Index = () => {
                   size="lg"
                   className="w-full gradient-purple text-white font-sora font-bold text-xl py-6 rounded-2xl hover:opacity-90 transition-opacity"
                 >
-                  GET LIFETIME ACCESS
+                  GET STARTED
                 </Button>
-
-                <p className="text-muted-foreground text-sm">
-                  Easy payments with UPI, Paytm, or Card
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* How It Works */}
-      <div className="bg-muted/30 py-24">
-        <div className="container mx-auto px-6">
-          <div className="max-w-4xl mx-auto">
-            <div className="text-center space-y-4 mb-16">
-              <h2 className="font-sora font-bold text-5xl text-foreground">
-                How It Works
-              </h2>
-              <p className="text-xl text-muted-foreground">
-                From roast to hired in 3 simple steps
-              </p>
-            </div>
-
-            <div className="grid md:grid-cols-3 gap-8">
-              <div className="floating-card p-8 text-center">
-                <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <span className="text-2xl font-sora font-bold text-purple-600">1</span>
-                </div>
-                <h3 className="font-sora font-bold text-xl text-foreground mb-4">Upload & Roast</h3>
-                <p className="text-muted-foreground">Upload your resume and get an instant ATS score with a hilarious roast</p>
-              </div>
-
-              <div className="floating-card p-8 text-center">
-                <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <span className="text-2xl font-sora font-bold text-purple-600">2</span>
-                </div>
-                <h3 className="font-sora font-bold text-xl text-foreground mb-4">Paste Job Description</h3>
-                <p className="text-muted-foreground">Copy any job posting and let AI create a perfectly tailored resume</p>
-              </div>
-
-              <div className="floating-card p-8 text-center">
-                <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <span className="text-2xl font-sora font-bold text-purple-600">3</span>
-                </div>
-                <h3 className="font-sora font-bold text-xl text-foreground mb-4">Download & Apply</h3>
-                <p className="text-muted-foreground">Get your optimized resume as PDF/DOCX and start applying with confidence</p>
               </div>
             </div>
           </div>
@@ -304,34 +250,28 @@ const Index = () => {
       </div>
 
       {/* Testimonials */}
-      <div className="py-24">
+      <div className="bg-muted/30 py-24">
         <div className="container mx-auto px-6">
           <div className="max-w-4xl mx-auto text-center space-y-12">
             <div className="space-y-4">
-              <h2 className="font-sora font-bold text-5xl text-foreground">
-                Job Seekers Love Rezoome
+              <h2 className="font-sora font-bold text-4xl text-foreground">
+                Trusted by Job Seekers
               </h2>
-              <p className="text-xl text-muted-foreground">
-                See what people are saying about their roasts
-              </p>
             </div>
 
             <div className="grid md:grid-cols-3 gap-8">
               {[
                 {
-                  text: "Got roasted so hard I rewrote my entire resume. Then used the job-specific generator for 5 applications. Landed 3 interviews! 🔥",
-                  author: "Sarah M., Marketing Manager",
-                  score: "ATS Score: 89/100"
+                  text: "The feedback was spot-on and helped me rewrite my entire resume. Landed 3 interviews from 5 applications!",
+                  author: "Sarah M., Marketing Manager"
                 },
                 {
-                  text: "The Chrome extension is a game-changer! I highlight any job post and get a tailored resume in seconds. Got my dream job at Google!",
-                  author: "Raj K., Software Engineer",
-                  score: "ATS Score: 76/100"
+                  text: "The Chrome extension saves me hours. I can tailor my resume for any job posting in seconds.",
+                  author: "Alex K., Software Engineer"
                 },
                 {
-                  text: "Best ₹430 I've spent on my career. The Hindi roasting is hilarious, and the job targeting actually works!",
-                  author: "Jessica L., Designer",
-                  score: "ATS Score: 82/100"
+                  text: "Simple, effective, and affordable. Best investment I've made for my job search.",
+                  author: "Jessica L., Designer"
                 }
               ].map((testimonial, index) => (
                 <div key={index} className="floating-card p-8">
@@ -341,10 +281,7 @@ const Index = () => {
                     ))}
                   </div>
                   <p className="text-foreground mb-6 italic text-lg">"{testimonial.text}"</p>
-                  <div className="space-y-2">
-                    <p className="font-sora font-semibold text-foreground">{testimonial.author}</p>
-                    <p className="text-purple-600 font-medium">{testimonial.score}</p>
-                  </div>
+                  <p className="font-sora font-semibold text-foreground">{testimonial.author}</p>
                 </div>
               ))}
             </div>
@@ -356,11 +293,11 @@ const Index = () => {
       <div className="gradient-purple py-24">
         <div className="container mx-auto px-6 text-center">
           <div className="max-w-3xl mx-auto space-y-8">
-            <h2 className="font-sora font-bold text-5xl text-white">
-              Ready to Get Hired?
+            <h2 className="font-sora font-bold text-4xl text-white">
+              Ready to Improve Your Resume?
             </h2>
             <p className="text-purple-100 text-xl">
-              Join thousands who've upgraded their resumes and landed their dream jobs with job-specific tailoring
+              Get instant feedback and create job-specific resumes that get noticed
             </p>
             
             <Button
@@ -368,12 +305,12 @@ const Index = () => {
               className="bg-white text-purple-600 hover:bg-gray-100 font-sora font-bold text-xl py-6 px-12 rounded-2xl transition-all duration-300 hover:scale-105"
               onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
             >
-              ROAST MY RESUME
+              GET STARTED
               <ArrowRight className="ml-2 h-6 w-6" />
             </Button>
 
             <p className="text-purple-200">
-              First roast is free • No signup required • Instant results
+              Try it free • No signup required • Instant results
             </p>
           </div>
         </div>

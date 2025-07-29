@@ -1,6 +1,6 @@
 
 import React, { useCallback, useState } from 'react';
-import { Upload, FileText, X, Sparkles, Globe } from 'lucide-react';
+import { Upload, FileText, X, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface FileUploadProps {
@@ -11,7 +11,6 @@ interface FileUploadProps {
 const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect, isLoading = false }) => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [selectedLanguage, setSelectedLanguage] = useState<'english' | 'hindi'>('english');
   const [roastPersonality, setRoastPersonality] = useState<'professional' | 'memer' | 'motivational' | 'hr'>('professional');
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -63,7 +62,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect, isLoading = false
               <div>
                 <p className="font-sora font-semibold text-foreground">{selectedFile.name}</p>
                 <p className="text-sm text-muted-foreground">
-                  {(selectedFile.size / 1024 / 1024).toFixed(2)} MB • Ready to roast
+                  {(selectedFile.size / 1024 / 1024).toFixed(2)} MB • Ready to analyze
                 </p>
               </div>
             </div>
@@ -77,38 +76,13 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect, isLoading = false
             </Button>
           </div>
 
-          {/* Language Selection */}
+          {/* Feedback Style Selection */}
           <div className="space-y-3">
-            <label className="font-sora font-medium text-foreground">Choose Language</label>
-            <div className="flex space-x-3">
-              <Button
-                variant={selectedLanguage === 'english' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setSelectedLanguage('english')}
-                className="flex items-center space-x-2"
-              >
-                <Globe className="h-4 w-4" />
-                <span>English</span>
-              </Button>
-              <Button
-                variant={selectedLanguage === 'hindi' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setSelectedLanguage('hindi')}
-                className="flex items-center space-x-2"
-              >
-                <Globe className="h-4 w-4" />
-                <span>हिंदी</span>
-              </Button>
-            </div>
-          </div>
-
-          {/* Roast Personality Selection */}
-          <div className="space-y-3">
-            <label className="font-sora font-medium text-foreground">Choose Roast Style</label>
+            <label className="font-sora font-medium text-foreground">Choose Feedback Style</label>
             <div className="grid grid-cols-2 gap-2">
               {([
                 { key: 'professional', label: 'Professional' },
-                { key: 'memer', label: 'Memer' },
+                { key: 'memer', label: 'Casual' },
                 { key: 'motivational', label: 'Motivational' },
                 { key: 'hr', label: 'HR Expert' }
               ] as const).map(({ key, label }) => (
@@ -134,17 +108,17 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect, isLoading = false
             {isLoading ? (
               <>
                 <Sparkles className="animate-spin mr-2 h-5 w-5" />
-                ROASTING YOUR RESUME...
+                ANALYZING RESUME...
               </>
             ) : (
               <>
-                ROAST MY RESUME 🔥
+                ANALYZE MY RESUME
               </>
             )}
           </Button>
 
           <p className="text-center text-sm text-muted-foreground">
-            Get instant ATS score + {selectedLanguage === 'hindi' ? 'Hindi' : 'English'} roast in {roastPersonality} style
+            Get instant ATS score and personalized feedback
           </p>
         </div>
       </div>
@@ -171,7 +145,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect, isLoading = false
           
           <div className="space-y-3">
             <h3 className="font-sora font-bold text-2xl text-foreground">
-              Drop Your Resume Here
+              Upload Your Resume
             </h3>
             <p className="text-muted-foreground text-lg">
               or <span className="text-purple-600 font-semibold underline">browse files</span>
@@ -182,10 +156,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect, isLoading = false
                 PDF files only • Max 10MB
               </p>
               <p className="text-purple-600 font-semibold text-sm">
-                First roast is completely FREE!
-              </p>
-              <p className="text-muted-foreground text-xs">
-                Supports English & Hindi • Multiple roast personalities
+                Free analysis included
               </p>
             </div>
           </div>

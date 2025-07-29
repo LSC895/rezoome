@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { ArrowLeft, Upload, FileText, Wand2, Download, Copy, Globe } from 'lucide-react';
+import { ArrowLeft, Upload, FileText, Wand2, Download, Copy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 
@@ -12,7 +12,6 @@ const ResumeGenerator: React.FC<ResumeGeneratorProps> = ({ onBack }) => {
   const [jobDescription, setJobDescription] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedResume, setGeneratedResume] = useState<string | null>(null);
-  const [selectedLanguage, setSelectedLanguage] = useState<'english' | 'hindi'>('english');
   const { toast } = useToast();
 
   const handleGenerateResume = async () => {
@@ -35,7 +34,7 @@ const ResumeGenerator: React.FC<ResumeGeneratorProps> = ({ onBack }) => {
 # TAILORED RESUME
 
 ## John Doe
-Software Engineer | john.doe@email.com | +91-9876543210
+Software Engineer | john.doe@email.com | +1-555-0123
 
 ### PROFESSIONAL SUMMARY
 Results-driven Software Engineer with 3+ years of experience in full-stack development, specializing in React, Node.js, and cloud technologies. Proven track record of delivering scalable applications and improving system performance by 40%. Experienced in agile methodologies and cross-functional collaboration.
@@ -49,7 +48,7 @@ Results-driven Software Engineer with 3+ years of experience in full-stack devel
 
 ### WORK EXPERIENCE
 
-**Senior Software Engineer** | TechCorp India | 2022 - Present
+**Senior Software Engineer** | TechCorp | 2022 - Present
 • Developed and maintained 5+ React-based web applications serving 100K+ users
 • Implemented microservices architecture reducing API response time by 35%
 • Led a team of 3 developers in agile sprints, delivering features 20% faster
@@ -62,8 +61,8 @@ Results-driven Software Engineer with 3+ years of experience in full-stack devel
 • Participated in code reviews and mentored junior developers
 
 ### EDUCATION
-**B.Tech in Computer Science** | IIT Delhi | 2021
-CGPA: 8.5/10
+**B.S. in Computer Science** | State University | 2021
+GPA: 3.8/4.0
 
 ### CERTIFICATIONS
 • AWS Certified Developer Associate (2023)
@@ -115,28 +114,6 @@ CGPA: 8.5/10
         <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
           Paste any job description and get an ATS-optimized resume tailored specifically for that role
         </p>
-      </div>
-
-      {/* Language Selection */}
-      <div className="flex justify-center space-x-4">
-        <Button
-          variant={selectedLanguage === 'english' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => setSelectedLanguage('english')}
-          className="space-x-2"
-        >
-          <Globe className="h-4 w-4" />
-          <span>English</span>
-        </Button>
-        <Button
-          variant={selectedLanguage === 'hindi' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => setSelectedLanguage('hindi')}
-          className="space-x-2"
-        >
-          <Globe className="h-4 w-4" />
-          <span>हिंदी</span>
-        </Button>
       </div>
 
       {/* Job Description Input */}
@@ -243,7 +220,7 @@ We are looking for a Senior Software Engineer with 3+ years of experience in Rea
             Get the Chrome Extension
           </h3>
           <p className="text-muted-foreground">
-            Highlight any job posting on LinkedIn, Naukri, or company websites and generate a tailored resume instantly with our Chrome extension.
+            Highlight any job posting on LinkedIn, Indeed, or company websites and generate a tailored resume instantly.
           </p>
           <Button 
             size="lg"

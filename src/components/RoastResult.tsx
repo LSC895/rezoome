@@ -52,8 +52,8 @@ const RoastResult: React.FC<RoastResultProps> = ({
 
   const roastPersonalities = {
     professional: "Your resume demonstrates solid fundamentals but requires strategic optimization to effectively communicate your value proposition to hiring managers and ATS systems.",
-    memer: "Bruh, your resume is giving 'I made this at 2 AM' energy 💀 Time to level up from intern vibes to CEO energy! Your skills section is more scattered than my Wi-Fi connection.",
-    motivational: "Listen champion, every great success story started with someone brave enough to improve! Your resume is a diamond in the rough - let's polish it until it SHINES! 🌟",
+    memer: "Your resume is giving 'I made this at 2 AM' energy. Time to level up from intern vibes to CEO energy! Your skills section is more scattered than my Wi-Fi connection.",
+    motivational: "Every great success story started with someone brave enough to improve! Your resume is a diamond in the rough - let's polish it until it SHINES! 🌟",
     hr: "From an HR perspective, this resume needs better keyword optimization and clearer quantifiable achievements to pass our initial screening process."
   };
 
@@ -86,7 +86,7 @@ const RoastResult: React.FC<RoastResultProps> = ({
           <div className="space-y-6">
             <div className="space-y-2">
               <h2 className="font-sora font-bold text-2xl text-foreground">ATS Score</h2>
-              <p className="text-muted-foreground">How well your resume performs with hiring bots</p>
+              <p className="text-muted-foreground">How well your resume performs with hiring systems</p>
             </div>
             
             <div className={`inline-flex items-center space-x-3 px-6 py-4 rounded-2xl border-2 ${getScoreColor(atsScore)}`}>
@@ -105,11 +105,11 @@ const RoastResult: React.FC<RoastResultProps> = ({
           </div>
         </div>
 
-        {/* Resume Roast */}
+        {/* Resume Feedback */}
         <div className="floating-card p-8">
           <div className="space-y-6">
             <div className="flex items-center justify-between">
-              <h2 className="font-sora font-bold text-2xl text-foreground">Resume Roast 🔥</h2>
+              <h2 className="font-sora font-bold text-2xl text-foreground">Detailed Feedback</h2>
               
               {/* Personality Selector */}
               <div className="flex space-x-2">
@@ -121,7 +121,7 @@ const RoastResult: React.FC<RoastResultProps> = ({
                     onClick={() => setCurrentPersonality(personality)}
                     className="capitalize text-xs"
                   >
-                    {personality}
+                    {personality === 'memer' ? 'casual' : personality}
                   </Button>
                 ))}
               </div>
