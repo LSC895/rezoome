@@ -1,6 +1,6 @@
 
 import React, { useCallback, useState } from 'react';
-import { Upload, FileText, X, Sparkles } from 'lucide-react';
+import { Upload, FileText, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface FileUploadProps {
@@ -11,7 +11,6 @@ interface FileUploadProps {
 const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect, isLoading = false }) => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [roastPersonality, setRoastPersonality] = useState<'professional' | 'memer' | 'motivational' | 'hr'>('professional');
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -46,7 +45,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect, isLoading = false
     setSelectedFile(null);
   }, []);
 
-  const handleRoast = () => {
+  const handleAnalyze = () => {
     if (selectedFile) {
       onFileSelect(selectedFile);
     }
@@ -54,15 +53,15 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect, isLoading = false
 
   if (selectedFile) {
     return (
-      <div className="floating-card p-8 animate-scale-in max-w-2xl mx-auto">
-        <div className="space-y-6">
+      <div className="border border-border rounded-lg p-6 bg-card">
+        <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <FileText className="h-8 w-8 text-purple-600" />
+              <FileText className="h-5 w-5 text-muted-foreground" />
               <div>
-                <p className="font-sora font-semibold text-foreground">{selectedFile.name}</p>
-                <p className="text-sm text-muted-foreground">
-                  {(selectedFile.size / 1024 / 1024).toFixed(2)} MB • Ready to analyze
+                <p className="text-sm font-medium text-foreground">{selectedFile.name}</p>
+                <p className="text-xs text-muted-foreground">
+                  {(selectedFile.size / 1024 / 1024).toFixed(1)} MB
                 </p>
               </div>
             </div>
@@ -70,106 +69,56 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect, isLoading = false
               variant="ghost"
               size="sm"
               onClick={clearFile}
-              className="text-muted-foreground hover:text-foreground"
+              className="h-8 w-8 p-0"
             >
-              <X className="h-5 w-5" />
+              <X className="h-4 w-4" />
             </Button>
-          </div>
-
-          {/* Feedback Style Selection */}
-          <div className="space-y-3">
-            <label className="font-sora font-medium text-foreground">Choose Feedback Style</label>
-            <div className="grid grid-cols-2 gap-2">
-              {([
-                { key: 'professional', label: 'Professional' },
-                { key: 'memer', label: 'Casual' },
-                { key: 'motivational', label: 'Motivational' },
-                { key: 'hr', label: 'HR Expert' }
-              ] as const).map(({ key, label }) => (
-                <Button
-                  key={key}
-                  variant={roastPersonality === key ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setRoastPersonality(key)}
-                  className="text-xs"
-                >
-                  {label}
-                </Button>
-              ))}
-            </div>
           </div>
           
           <Button
-            onClick={handleRoast}
+            onClick={handleAnalyze}
             disabled={isLoading}
-            size="lg"
-            className="w-full gradient-purple text-white font-sora font-bold py-4 text-lg hover:opacity-90 transition-opacity rounded-2xl"
+            className="w-full bg-foreground text-background hover:bg-foreground/90"
           >
-            {isLoading ? (
-              <>
-                <Sparkles className="animate-spin mr-2 h-5 w-5" />
-                ANALYZING RESUME...
-              </>
-            ) : (
-              <>
-                ANALYZE MY RESUME
-              </>
-            )}
+            {isLoading ? 'Analyzing...' : 'Analyze resume'}
           </Button>
-
-          <p className="text-center text-sm text-muted-foreground">
-            Get instant ATS score and personalized feedback
-          </p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-2xl mx-auto">
-      <div
-        className={`floating-card p-12 border-2 border-dashed transition-all duration-300 cursor-pointer ${
-          isDragOver 
-            ? 'border-purple-400 bg-purple-50 scale-105' 
-            : 'border-border hover:border-purple-300 hover:bg-muted/30'
-        }`}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-        onClick={() => document.getElementById('file-upload')?.click()}
-      >
-        <div className="text-center space-y-6">
-          <div className={`${isDragOver ? 'animate-bounce' : ''}`}>
-            <Upload className={`h-16 w-16 mx-auto ${isDragOver ? 'text-purple-600' : 'text-muted-foreground'}`} />
-          </div>
-          
-          <div className="space-y-3">
-            <h3 className="font-sora font-bold text-2xl text-foreground">
-              Upload Your Resume
-            </h3>
-            <p className="text-muted-foreground text-lg">
-              or <span className="text-purple-600 font-semibold underline">browse files</span>
-            </p>
-            
-            <div className="space-y-2 pt-4">
-              <p className="text-sm text-muted-foreground">
-                PDF files only • Max 10MB
-              </p>
-              <p className="text-purple-600 font-semibold text-sm">
-                Free analysis included
-              </p>
-            </div>
-          </div>
-        </div>
+    <div
+      className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+        isDragOver 
+          ? 'border-foreground bg-muted/20' 
+          : 'border-border hover:border-muted-foreground'
+      }`}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      onClick={() => document.getElementById('file-upload')?.click()}
+    >
+      <div className="space-y-4">
+        <Upload className="h-8 w-8 mx-auto text-muted-foreground" />
         
-        <input
-          id="file-upload"
-          type="file"
-          accept=".pdf"
-          onChange={handleFileChange}
-          className="hidden"
-        />
+        <div className="space-y-2">
+          <p className="text-sm font-medium text-foreground">
+            Drop your resume here
+          </p>
+          <p className="text-xs text-muted-foreground">
+            or click to browse • PDF only
+          </p>
+        </div>
       </div>
+      
+      <input
+        id="file-upload"
+        type="file"
+        accept=".pdf"
+        onChange={handleFileChange}
+        className="hidden"
+      />
     </div>
   );
 };
