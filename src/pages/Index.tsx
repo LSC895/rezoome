@@ -104,7 +104,10 @@ const Index = () => {
             <div className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
               Rezoome
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-6">
+              <div className="text-sm text-muted-foreground">
+                0 credits left
+              </div>
               <Link to="/pricing">
                 <Button variant="ghost" size="sm" className="text-sm">
                   Pricing
@@ -133,11 +136,29 @@ const Index = () => {
           {/* Main Headline */}
           <div className="space-y-6">
             <h1 className="text-6xl md:text-7xl font-bold leading-tight">
-              <span className="bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 bg-clip-text text-transparent">
-                One resume
-              </span>
+              <span className="text-foreground">Improve your resume.</span>
               <br />
-              <span className="text-foreground">for every job!</span>
+              <span className="text-foreground">Get hired faster.</span>
+              <br />
+              <span className="relative inline-block">
+                <span className="bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 bg-clip-text text-transparent">
+                  Every job
+                </span>
+                <svg 
+                  className="absolute -bottom-2 left-0 w-full h-3 text-black"
+                  viewBox="0 0 200 12"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path 
+                    d="M2 10C20 2, 40 8, 60 4C80 2, 100 6, 120 3C140 1, 160 5, 180 2C190 1, 195 3, 198 2" 
+                    stroke="currentColor" 
+                    strokeWidth="2" 
+                    strokeLinecap="round"
+                    fill="none"
+                  />
+                </svg>
+              </span>
             </h1>
             
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
