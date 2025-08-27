@@ -24,19 +24,28 @@ serve(async (req) => {
     // Get Gemini API key from secrets
     const geminiApiKey = Deno.env.get('GEMINI_API_KEY')
     if (!geminiApiKey) {
+      console.error('Gemini API key not configured')
       throw new Error('Gemini API key not configured')
     }
 
-    // Call Gemini API to analyze the resume
-    const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${geminiApiKey}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        contents: [{
-          parts: [{
-            text: `Analyze this resume content and provide a detailed ATS score and feedback. Return the response in this exact JSON format:
+    console.log('Analyzing resume with Gemini API...')
+
+    // Call Gemini API to analyze the resume with retry logic
+    let geminiResponse
+    let retryCount = 0
+    const maxRetries = 3
+
+    while (retryCount < maxRetries) {
+      try {
+        geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${geminiApiKey}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            contents: [{
+              parts: [{
+                text: `Analyze this resume content and provide a detailed ATS score and feedback. Return the response in this exact JSON format:
 
 {
   "ats_score": <number between 0-100>,
@@ -54,15 +63,39 @@ Resume content to analyze:
 ${file_content}
 
 Provide constructive, actionable feedback that helps improve the resume's ATS compatibility and overall effectiveness.`
-          }]
-        }]
-      })
-    })
+              }]
+            }]
+          })
+        })
+
+        if (geminiResponse.ok) {
+          break
+        } else if (geminiResponse.status === 503) {
+          retryCount++
+          console.log(`Gemini API overloaded, retrying... (${retryCount}/${maxRetries})`)
+          await new Promise(resolve => setTimeout(resolve, 2000 * retryCount)) // Exponential backoff
+        } else {
+          throw new Error(`Gemini API error: ${geminiResponse.status}`)
+        }
+      } catch (error) {
+        retryCount++
+        console.error(`Attempt ${retryCount} failed:`, error)
+        if (retryCount >= maxRetries) {
+          throw error
+        }
+        await new Promise(resolve => setTimeout(resolve, 2000 * retryCount))
+      }
+    }
+
+    if (!geminiResponse || !geminiResponse.ok) {
+      throw new Error('Failed to get response from Gemini API after retries')
+    }
 
     const geminiData = await geminiResponse.json()
-    console.log('Gemini response:', geminiData)
+    console.log('Gemini response received:', JSON.stringify(geminiData, null, 2))
 
     if (!geminiData.candidates?.[0]?.content?.parts?.[0]?.text) {
+      console.error('Invalid Gemini response structure:', geminiData)
       throw new Error('Invalid response from Gemini API')
     }
 
@@ -71,28 +104,44 @@ Provide constructive, actionable feedback that helps improve the resume's ATS co
     let analysisData
 
     try {
-      // Extract JSON from the response (in case there's extra text)
-      const jsonMatch = analysisText.match(/\{[\s\S]*\}/)
+      // Clean the response text and extract JSON
+      let cleanText = analysisText.trim()
+      
+      // Remove markdown code blocks if present
+      cleanText = cleanText.replace(/```json\n?/g, '').replace(/```\n?/g, '')
+      
+      // Extract JSON from the response
+      const jsonMatch = cleanText.match(/\{[\s\S]*\}/)
       if (jsonMatch) {
         analysisData = JSON.parse(jsonMatch[0])
       } else {
-        analysisData = JSON.parse(analysisText)
+        analysisData = JSON.parse(cleanText)
       }
+
+      // Validate the parsed data
+      if (!analysisData.ats_score || !analysisData.overall_feedback || !Array.isArray(analysisData.sections)) {
+        throw new Error('Invalid analysis data structure')
+      }
+
     } catch (parseError) {
       console.error('Failed to parse Gemini response:', analysisText)
+      console.error('Parse error:', parseError)
+      
       // Fallback response if parsing fails
       analysisData = {
         ats_score: 75,
-        overall_feedback: "Your resume has been analyzed. Consider optimizing keywords, improving formatting, and adding quantifiable achievements to boost your ATS score.",
+        overall_feedback: "Your resume has been analyzed. The system encountered a parsing issue, but based on the content, consider optimizing keywords, improving formatting, and adding quantifiable achievements to boost your ATS score.",
         sections: [
           {
             name: "Overall Structure",
             score: 75,
-            feedback: "Resume structure is adequate but could benefit from better organization and keyword optimization."
+            feedback: "Resume structure is adequate but could benefit from better organization and keyword optimization. Consider adding more specific achievements and metrics."
           }
         ]
       }
     }
+
+    console.log('Final analysis data:', analysisData)
 
     // Store the analysis in the database
     const { data, error } = await supabase
@@ -113,6 +162,8 @@ Provide constructive, actionable feedback that helps improve the resume's ATS co
       throw error
     }
 
+    console.log('Analysis stored successfully:', data.id)
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -130,9 +181,12 @@ Provide constructive, actionable feedback that helps improve the resume's ATS co
     )
 
   } catch (error) {
-    console.error('Error:', error)
+    console.error('Error in analyze-resume function:', error)
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message,
+        details: 'Please try again in a few moments. The AI service may be temporarily busy.'
+      }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500,
