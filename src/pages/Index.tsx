@@ -6,46 +6,16 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useSession } from '@/hooks/useSession';
 import { Link } from 'react-router-dom';
-import { ThemeToggle } from '@/components/ThemeToggle';
 import { SignedIn, SignedOut, SignInButton, UserButton } from '@clerk/clerk-react';
+import { useNavigate } from 'react-router-dom';
 
 const Index = () => {
-  const [currentStep, setCurrentStep] = useState('upload');
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
-  const { sessionId, isLoading: sessionLoading } = useSession();
+  const navigate = useNavigate();
   const { toast } = useToast();
 
-  const handleFileSelect = async (file: File) => {
-    if (!sessionId) {
-      toast({
-        title: "Session Error",
-        description: "Please refresh the page and try again.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setUploadedFile(file);
-    setCurrentStep('generator');
-  };
-
-  const handleTryAgain = () => {
-    setCurrentStep('upload');
-    setUploadedFile(null);
-  };
-
-  if (currentStep === 'generator' && uploadedFile) {
-    return (
-      <div className="min-h-screen bg-background">
-        <div className="container mx-auto px-6 py-16 max-w-4xl">
-          <ResumeGenerator onBack={handleTryAgain} uploadedFile={uploadedFile} />
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-background to-blue-50 dark:from-purple-950/20 dark:via-background dark:to-blue-950/20">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50">
       {/* Header */}
       <div className="border-b border-border/50 bg-background/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-6 py-4">
@@ -69,7 +39,6 @@ const Index = () => {
               <SignedIn>
                 <UserButton />
               </SignedIn>
-              <ThemeToggle />
               <a 
                 href="https://twitter.com" 
                 target="_blank" 
@@ -102,13 +71,24 @@ const Index = () => {
             </p>
           </div>
 
-          {/* Upload Section */}
+          {/* Get Started Section */}
           <div className="max-w-lg mx-auto">
-            {sessionLoading ? (
-              <div className="text-center text-muted-foreground">Loading...</div>
-            ) : (
-              <FileUpload onFileSelect={handleFileSelect} isLoading={false} />
-            )}
+            <SignedOut>
+              <SignInButton mode="modal">
+                <Button size="lg" className="text-lg px-8 py-6 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg">
+                  Get Started - Sign In
+                </Button>
+              </SignInButton>
+            </SignedOut>
+            <SignedIn>
+              <Button 
+                size="lg" 
+                className="text-lg px-8 py-6 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg"
+                onClick={() => navigate('/home')}
+              >
+                Start Creating Resume
+              </Button>
+            </SignedIn>
           </div>
 
           {/* Single Feature */}
