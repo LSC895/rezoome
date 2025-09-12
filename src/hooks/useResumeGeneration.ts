@@ -19,11 +19,7 @@ export const useResumeGeneration = () => {
     
     try {
       // Set session context for RLS policies
-      await supabase.rpc('set_config', {
-        setting_name: 'app.current_session_id',
-        setting_value: sessionId,
-        is_local: true
-      });
+      await supabase.rpc('set_session_context', { session_id_param: sessionId });
 
       // Get original resume content from localStorage
       const originalResume = localStorage.getItem('originalResumeContent') || '';
