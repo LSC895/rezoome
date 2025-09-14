@@ -1,11 +1,15 @@
 
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Wand2, Copy } from 'lucide-react';
+import { ArrowLeft, Wand2, FileText, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useResumeGeneration } from '@/hooks/useResumeGeneration';
 import { useSession } from '@/hooks/useSession';
+import { useContactExtraction } from '@/hooks/useContactExtraction';
 import { EditableResume } from './EditableResume';
 import ChromeExtensionPromo from './ChromeExtensionPromo';
+import LoadingSkeleton from './LoadingSkeleton';
+import TemplateSelector from './TemplateSelector';
+import ContactInfoEditor from './ContactInfoEditor';
 import { supabase } from '@/integrations/supabase/client';
 
 interface ResumeGeneratorProps {
@@ -16,8 +20,15 @@ interface ResumeGeneratorProps {
 const ResumeGenerator: React.FC<ResumeGeneratorProps> = ({ onBack, uploadedFile }) => {
   const [jobDescription, setJobDescription] = useState('');
   const [editedResumeContent, setEditedResumeContent] = useState('');
+  const [selectedTemplate, setSelectedTemplate] = useState<'modern' | 'classic' | 'creative'>('modern');
+  const [includeCoverLetter, setIncludeCoverLetter] = useState(true);
+  const [generatedCoverLetter, setGeneratedCoverLetter] = useState('');
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [loadingStatus, setLoadingStatus] = useState('');
+  
   const { generateResume, isGenerating, generatedResume } = useResumeGeneration();
   const { sessionId } = useSession();
+  const { contactInfo, setContactInfo, extractContactInfo } = useContactExtraction();
 
   // Store the uploaded file content for generation
   useEffect(() => {
@@ -39,6 +50,11 @@ const ResumeGenerator: React.FC<ResumeGeneratorProps> = ({ onBack, uploadedFile 
         
         const { extractedText } = response.data;
         localStorage.setItem('originalResumeContent', extractedText);
+        
+        // Extract contact info from parsed resume
+        const extracted = extractContactInfo(extractedText);
+        setContactInfo(extracted);
+        
         console.log(`Successfully parsed ${uploadedFile.name}: ${extractedText.length} characters`);
         
       } catch (error) {
@@ -64,20 +80,71 @@ SKILLS
     };
 
     parseAndStoreFile();
-  }, [uploadedFile]);
+  }, [uploadedFile, extractContactInfo, setContactInfo]);
 
   // Update edited content when new resume is generated
   useEffect(() => {
     if (generatedResume?.content) {
       setEditedResumeContent(generatedResume.content);
+      if (generatedResume.cover_letter) {
+        setGeneratedCoverLetter(generatedResume.cover_letter);
+      }
+      if (generatedResume.contact_info) {
+        setContactInfo(generatedResume.contact_info);
+      }
     }
-  }, [generatedResume]);
+  }, [generatedResume, setContactInfo]);
+
+  // Loading progress simulation
+  useEffect(() => {
+    if (isGenerating) {
+      setLoadingProgress(0);
+      setLoadingStatus('Analyzing job description...');
+      
+      const interval = setInterval(() => {
+        setLoadingProgress(prev => {
+          if (prev < 30) {
+            setLoadingStatus('Parsing your master resume...');
+            return prev + 2;
+          } else if (prev < 60) {
+            setLoadingStatus('Tailoring content with AI...');
+            return prev + 1;
+          } else if (prev < 85) {
+            setLoadingStatus('Optimizing for ATS compatibility...');
+            return prev + 0.5;
+          } else if (prev < 95) {
+            setLoadingStatus('Finalizing your tailored resume...');
+            return prev + 0.2;
+          }
+          return prev;
+        });
+      }, 500);
+
+      return () => clearInterval(interval);
+    }
+  }, [isGenerating]);
 
   const handleGenerateResume = async () => {
     if (!jobDescription.trim() || !sessionId) return;
     
     try {
-      await generateResume(jobDescription, sessionId);
+      const originalResume = localStorage.getItem('originalResumeContent') || '';
+      
+      const response = await supabase.functions.invoke('generate-content', {
+        body: {
+          job_description: jobDescription,
+          session_id: sessionId,
+          original_resume: originalResume,
+          template: selectedTemplate,
+          contact_info: contactInfo,
+          include_cover_letter: includeCoverLetter
+        }
+      });
+
+      if (response.error) throw response.error;
+      
+      // The useResumeGeneration hook will handle the response
+      await generateResume(jobDescription, sessionId, selectedTemplate, contactInfo, includeCoverLetter);
     } catch (error) {
       console.error('Failed to generate resume:', error);
     }
@@ -91,7 +158,7 @@ SKILLS
     const element = document.createElement('a');
     const file = new Blob([editedResumeContent], { type: 'text/plain' });
     element.href = URL.createObjectURL(file);
-    element.download = `tailored-resume-${new Date().toISOString().split('T')[0]}.txt`;
+    element.download = `tailored-resume-${selectedTemplate}-${new Date().toISOString().split('T')[0]}.txt`;
     document.body.appendChild(element);
     element.click();
     document.body.removeChild(element);
@@ -102,7 +169,19 @@ SKILLS
     const element = document.createElement('a');
     const file = new Blob([editedResumeContent], { type: 'text/plain' });
     element.href = URL.createObjectURL(file);
-    element.download = `tailored-resume-${new Date().toISOString().split('T')[0]}.txt`;
+    element.download = `tailored-resume-${selectedTemplate}-${new Date().toISOString().split('T')[0]}.txt`;
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+    URL.revokeObjectURL(element.href);
+  };
+
+  const handleDownloadCoverLetter = () => {
+    if (!generatedCoverLetter) return;
+    const element = document.createElement('a');
+    const file = new Blob([generatedCoverLetter], { type: 'text/plain' });
+    element.href = URL.createObjectURL(file);
+    element.download = `cover-letter-${new Date().toISOString().split('T')[0]}.txt`;
     document.body.appendChild(element);
     element.click();
     document.body.removeChild(element);
@@ -136,6 +215,20 @@ SKILLS
         </div>
       </div>
 
+      {/* Contact Information Editor */}
+      <ContactInfoEditor 
+        contactInfo={contactInfo}
+        onContactInfoChange={setContactInfo}
+      />
+
+      {/* Template Selection */}
+      <div className="floating-card p-8 max-w-4xl mx-auto">
+        <TemplateSelector 
+          selectedTemplate={selectedTemplate}
+          onTemplateChange={setSelectedTemplate}
+        />
+      </div>
+
       {/* Job Description Input */}
       <div className="floating-card p-8 max-w-4xl mx-auto">
         <div className="space-y-6">
@@ -159,6 +252,26 @@ We are looking for a Senior Software Engineer with 3+ years of experience in Rea
             className="w-full h-64 p-4 border border-border rounded-2xl text-foreground bg-background placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
           />
 
+          {/* Cover Letter Option */}
+          <div className="flex items-center space-x-3 p-4 bg-muted/50 rounded-xl">
+            <input
+              type="checkbox"
+              id="includeCoverLetter"
+              checked={includeCoverLetter}
+              onChange={(e) => setIncludeCoverLetter(e.target.checked)}
+              className="rounded border-border"
+            />
+            <div>
+              <label htmlFor="includeCoverLetter" className="font-medium text-foreground cursor-pointer flex items-center">
+                <FileText className="h-4 w-4 mr-2" />
+                Generate matching cover letter
+              </label>
+              <p className="text-sm text-muted-foreground">
+                Create a personalized cover letter that complements your tailored resume
+              </p>
+            </div>
+          </div>
+
           <div className="flex justify-center">
             <Button
               onClick={handleGenerateResume}
@@ -169,12 +282,12 @@ We are looking for a Senior Software Engineer with 3+ years of experience in Rea
               {isGenerating ? (
                 <>
                   <Wand2 className="animate-spin mr-2 h-5 w-5" />
-                  GENERATING RESUME...
+                  GENERATING...
                 </>
               ) : (
                 <>
                   <Wand2 className="mr-2 h-5 w-5" />
-                  GENERATE TAILORED RESUME
+                  GENERATE {includeCoverLetter ? 'RESUME & COVER LETTER' : 'TAILORED RESUME'}
                 </>
               )}
             </Button>
@@ -182,21 +295,55 @@ We are looking for a Senior Software Engineer with 3+ years of experience in Rea
         </div>
       </div>
 
-      {/* Generated Resume Preview */}
-      {generatedResume && (
-        <div className="floating-card p-8 max-w-4xl mx-auto animate-scale-in">
-          <EditableResume
-            initialContent={editedResumeContent}
-            onSave={handleSaveResume}
-            onDownloadPDF={handleDownloadPDF}
-            onDownloadDOCX={handleDownloadDOCX}
-          />
+      {/* Loading State */}
+      {isGenerating && (
+        <LoadingSkeleton progress={loadingProgress} status={loadingStatus} />
+      )}
 
-          <div className="text-center space-y-4 mt-6">
-            <p className="text-muted-foreground">
-              This resume has been optimized with keywords from the job description and tailored to match the specific requirements.
-            </p>
+      {/* Generated Resume Preview */}
+      {generatedResume && !isGenerating && (
+        <div className="space-y-6">
+          <div className="floating-card p-8 max-w-4xl mx-auto animate-scale-in">
+            <EditableResume
+              initialContent={editedResumeContent}
+              onSave={handleSaveResume}
+              onDownloadPDF={handleDownloadPDF}
+              onDownloadDOCX={handleDownloadDOCX}
+            />
+
+            <div className="text-center space-y-4 mt-6">
+              <p className="text-muted-foreground">
+                This resume has been optimized with keywords from the job description and tailored to match the specific requirements using the {selectedTemplate} template.
+              </p>
+            </div>
           </div>
+
+          {/* Cover Letter Preview */}
+          {generatedCoverLetter && (
+            <div className="floating-card p-8 max-w-4xl mx-auto animate-scale-in">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="font-sora font-bold text-2xl text-foreground flex items-center">
+                  <FileText className="h-6 w-6 mr-2" />
+                  Your Cover Letter
+                </h3>
+                <Button
+                  onClick={handleDownloadCoverLetter}
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Download
+                </Button>
+              </div>
+              
+              <div className="bg-background border border-border rounded-xl p-6">
+                <pre className="whitespace-pre-wrap font-sans text-sm text-foreground leading-relaxed">
+                  {generatedCoverLetter}
+                </pre>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

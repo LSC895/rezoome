@@ -1,11 +1,22 @@
 
+// Updated hook to support new generation parameters
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
+interface ContactInfo {
+  name: string;
+  phone: string;
+  email: string;
+  linkedin: string;
+}
+
 interface GeneratedResume {
   id: string;
   content: string;
+  cover_letter?: string;
+  contact_info?: ContactInfo;
+  template: string;
   ats_score: number;
 }
 
@@ -14,7 +25,13 @@ export const useResumeGeneration = () => {
   const [generatedResume, setGeneratedResume] = useState<GeneratedResume | null>(null);
   const { toast } = useToast();
 
-  const generateResume = async (jobDescription: string, sessionId: string) => {
+  const generateResume = async (
+    jobDescription: string, 
+    sessionId: string, 
+    template: string = 'modern',
+    contactInfo?: ContactInfo,
+    includeCoverLetter: boolean = false
+  ) => {
     setIsGenerating(true);
     
     try {
@@ -24,11 +41,14 @@ export const useResumeGeneration = () => {
       // Get original resume content from localStorage
       const originalResume = localStorage.getItem('originalResumeContent') || '';
       
-      const { data, error } = await supabase.functions.invoke('generate-resume', {
+      const { data, error } = await supabase.functions.invoke('generate-content', {
         body: {
           job_description: jobDescription,
           session_id: sessionId,
-          original_resume: originalResume
+          original_resume: originalResume,
+          template: template,
+          contact_info: contactInfo,
+          include_cover_letter: includeCoverLetter
         }
       });
 
@@ -37,8 +57,10 @@ export const useResumeGeneration = () => {
       setGeneratedResume(data.resume);
       
       toast({
-        title: "Resume generated! ✨",
-        description: "Your job-specific resume is ready for download.",
+        title: includeCoverLetter ? "Resume & Cover Letter generated! ✨" : "Resume generated! ✨",
+        description: includeCoverLetter 
+          ? "Your job-specific resume and cover letter are ready for download."
+          : "Your job-specific resume is ready for download.",
       });
 
       return data.resume;
