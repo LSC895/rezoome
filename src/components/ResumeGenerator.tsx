@@ -128,22 +128,6 @@ SKILLS
     if (!jobDescription.trim() || !sessionId) return;
     
     try {
-      const originalResume = localStorage.getItem('originalResumeContent') || '';
-      
-      const response = await supabase.functions.invoke('generate-content', {
-        body: {
-          job_description: jobDescription,
-          session_id: sessionId,
-          original_resume: originalResume,
-          template: selectedTemplate,
-          contact_info: contactInfo,
-          include_cover_letter: includeCoverLetter
-        }
-      });
-
-      if (response.error) throw response.error;
-      
-      // The useResumeGeneration hook will handle the response
       await generateResume(jobDescription, sessionId, selectedTemplate, contactInfo, includeCoverLetter);
     } catch (error) {
       console.error('Failed to generate resume:', error);

@@ -17,27 +17,36 @@ export type Database = {
       generated_resumes: {
         Row: {
           ats_optimization_score: number | null
+          contact_info: Json | null
+          cover_letter: string | null
           created_at: string
           generated_content: string
           id: string
           job_description: string
           session_id: string
+          template: string | null
         }
         Insert: {
           ats_optimization_score?: number | null
+          contact_info?: Json | null
+          cover_letter?: string | null
           created_at?: string
           generated_content: string
           id?: string
           job_description: string
           session_id: string
+          template?: string | null
         }
         Update: {
           ats_optimization_score?: number | null
+          contact_info?: Json | null
+          cover_letter?: string | null
           created_at?: string
           generated_content?: string
           id?: string
           job_description?: string
           session_id?: string
+          template?: string | null
         }
         Relationships: []
       }
