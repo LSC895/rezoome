@@ -40,15 +40,19 @@ const ResumeGenerator: React.FC<ResumeGeneratorProps> = ({ onBack, uploadedFile 
         const formData = new FormData();
         formData.append('file', uploadedFile);
         
-        const response = await supabase.functions.invoke('parse-document', {
-          body: formData
+        const FUNCTION_URL = 'https://wmqtvnurwoispusqlsgw.supabase.co/functions/v1/parse-document';
+        const resp = await fetch(FUNCTION_URL, {
+          method: 'POST',
+          body: formData,
         });
-        
-        if (response.error) {
-          throw new Error(response.error.message || 'Failed to parse document');
+
+        if (!resp.ok) {
+          const errText = await resp.text();
+          throw new Error(errText || 'Failed to parse document');
         }
-        
-        const { extractedText } = response.data;
+
+        const responseData = await resp.json();
+        const { extractedText } = responseData;
         localStorage.setItem('originalResumeContent', extractedText);
         
         // Extract contact info from parsed resume
