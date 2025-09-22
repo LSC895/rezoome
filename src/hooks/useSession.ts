@@ -20,14 +20,20 @@ export const useSession = () => {
           
           storedSessionId = data.session_id;
           localStorage.setItem('resume_session_id', storedSessionId);
-
-          // Set session context for RLS policies
-          await supabase.rpc('set_session_context', { session_id_param: storedSessionId });
         } catch (error) {
           console.error('Failed to create session:', error);
           // Fallback to client-side generated session
           storedSessionId = crypto.randomUUID();
           localStorage.setItem('resume_session_id', storedSessionId);
+        }
+      }
+      
+      // CRITICAL: Always set session context for RLS policies, even for existing sessions
+      if (storedSessionId) {
+        try {
+          await supabase.rpc('set_session_context', { session_id_param: storedSessionId });
+        } catch (error) {
+          console.error('Failed to set session context:', error);
         }
       }
       
