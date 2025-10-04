@@ -7,13 +7,62 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Rate limiting
+const requestCounts = new Map<string, { count: number; timestamp: number }>()
+const RATE_LIMIT = 20 // Max 20 requests per minute
+const RATE_WINDOW = 60000
+
+function checkRateLimit(clientId: string): boolean {
+  const now = Date.now()
+  const record = requestCounts.get(clientId)
+  
+  if (!record || now - record.timestamp > RATE_WINDOW) {
+    requestCounts.set(clientId, { count: 1, timestamp: now })
+    return true
+  }
+  
+  if (record.count >= RATE_LIMIT) {
+    return false
+  }
+  
+  record.count++
+  return true
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  // Rate limiting
+  const clientId = req.headers.get('x-forwarded-for') || 'unknown'
+  if (!checkRateLimit(clientId)) {
+    console.warn(`Rate limit exceeded for client: ${clientId}`)
+    return new Response(
+      JSON.stringify({ error: 'Too many requests. Please try again in a minute.' }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 429 
+      }
+    )
+  }
+
   try {
     const { file_content, file_name, file_size, session_id } = await req.json()
+
+    // Input validation
+    if (!file_content || file_content.length > 100000) {
+      throw new Error('Invalid file content length')
+    }
+    if (!file_name || file_name.length > 255) {
+      throw new Error('Invalid file name')
+    }
+    if (!file_size || file_size > 10 * 1024 * 1024) {
+      throw new Error('File size exceeds 10MB limit')
+    }
+    if (!session_id || session_id.length > 100) {
+      throw new Error('Invalid session ID')
+    }
 
     // Initialize Supabase client
     const supabase = createClient(

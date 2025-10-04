@@ -6,13 +6,59 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Rate limiting
+const requestCounts = new Map<string, { count: number; timestamp: number }>()
+const RATE_LIMIT = 30 // Max 30 requests per minute
+const RATE_WINDOW = 60000
+
+function checkRateLimit(clientId: string): boolean {
+  const now = Date.now()
+  const record = requestCounts.get(clientId)
+  
+  if (!record || now - record.timestamp > RATE_WINDOW) {
+    requestCounts.set(clientId, { count: 1, timestamp: now })
+    return true
+  }
+  
+  if (record.count >= RATE_LIMIT) {
+    return false
+  }
+  
+  record.count++
+  return true
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  // Rate limiting
+  const clientId = req.headers.get('x-forwarded-for') || 'unknown'
+  if (!checkRateLimit(clientId)) {
+    console.warn(`Rate limit exceeded for client: ${clientId}`)
+    return new Response(
+      JSON.stringify({ error: 'Too many requests. Please try again in a minute.' }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 429 
+      }
+    )
+  }
+
   try {
     const { job_description, session_id, original_resume, template, contact_info, include_cover_letter } = await req.json()
+    
+    // Input validation
+    if (!job_description || job_description.length > 50000) {
+      throw new Error('Invalid job description length')
+    }
+    if (!session_id || session_id.length > 100) {
+      throw new Error('Invalid session ID')
+    }
+    if (!original_resume || original_resume.length > 100000) {
+      throw new Error('Invalid resume length')
+    }
 
     // Initialize Supabase client with Service Role
     const supabase = createClient(

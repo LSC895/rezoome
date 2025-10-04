@@ -5,9 +5,48 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Rate limiting: Track requests by IP
+const requestCounts = new Map<string, { count: number; timestamp: number }>()
+const RATE_LIMIT = 10 // Max requests per minute
+const RATE_WINDOW = 60000 // 1 minute in milliseconds
+
+function checkRateLimit(clientId: string): boolean {
+  const now = Date.now()
+  const record = requestCounts.get(clientId)
+  
+  if (!record || now - record.timestamp > RATE_WINDOW) {
+    requestCounts.set(clientId, { count: 1, timestamp: now })
+    return true
+  }
+  
+  if (record.count >= RATE_LIMIT) {
+    return false
+  }
+  
+  record.count++
+  return true
+}
+
+// Cache for parsed documents
+const documentCache = new Map<string, { text: string; timestamp: number }>()
+const CACHE_DURATION = 300000 // 5 minutes
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
+  }
+
+  // Rate limiting
+  const clientId = req.headers.get('x-forwarded-for') || 'unknown'
+  if (!checkRateLimit(clientId)) {
+    console.warn(`Rate limit exceeded for client: ${clientId}`)
+    return new Response(
+      JSON.stringify({ error: 'Too many requests. Please try again later.' }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 429 
+      }
+    )
   }
 
   try {
@@ -16,6 +55,38 @@ serve(async (req) => {
     
     if (!file) {
       throw new Error('No file provided')
+    }
+
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      throw new Error('File size exceeds 10MB limit')
+    }
+
+    // Validate file name length
+    if (file.name.length > 255) {
+      throw new Error('File name too long')
+    }
+
+    // Create cache key
+    const cacheKey = `${file.name}-${file.size}`
+    
+    // Check cache first
+    const cached = documentCache.get(cacheKey)
+    if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+      console.log(`Serving cached result for: ${file.name}`)
+      return new Response(
+        JSON.stringify({
+          success: true,
+          extractedText: cached.text,
+          fileName: file.name,
+          fileSize: file.size,
+          cached: true
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      )
     }
 
     console.log(`Parsing document: ${file.name}, type: ${file.type}, size: ${file.size}`)
@@ -113,12 +184,26 @@ Note: Template created from uploaded file: ${file.name}. Please customize with y
 
     console.log(`Extracted ${extractedText.length} characters from ${file.name}`)
 
+    // Cache the result
+    documentCache.set(cacheKey, { text: extractedText, timestamp: Date.now() })
+    
+    // Clean old cache entries
+    if (documentCache.size > 100) {
+      const now = Date.now()
+      for (const [key, value] of documentCache.entries()) {
+        if (now - value.timestamp > CACHE_DURATION) {
+          documentCache.delete(key)
+        }
+      }
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
         extractedText: extractedText,
         fileName: file.name,
-        fileSize: file.size
+        fileSize: file.size,
+        cached: false
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
