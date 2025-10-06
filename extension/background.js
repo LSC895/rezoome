@@ -35,24 +35,24 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 async function handleResumeGeneration(jobDescription, sendResponse) {
   try {
-    // Get stored authentication token
-    const result = await chrome.storage.sync.get(['authToken', 'sessionId']);
+    // Get stored authentication credentials - require proper setup
+    const result = await chrome.storage.sync.get(['authToken', 'sessionId', 'supabaseKey']);
     
-    if (!result.authToken || !result.sessionId) {
+    if (!result.authToken || !result.sessionId || !result.supabaseKey) {
       sendResponse({
         success: false,
-        error: "Please log in to Rezoome first by clicking the extension icon"
+        error: "Please authenticate first via the Rezoome web app"
       });
       return;
     }
 
-    // Call Supabase edge function to generate resume
+    // Call Supabase edge function with stored credentials
     const response = await fetch('https://wmqtvnurwoispusqlsgw.supabase.co/functions/v1/generate-resume', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${result.authToken}`,
-        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndtcXR2bnVyd29pc3B1c3Fsc2d3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU4MDMzNjYsImV4cCI6MjA3MTM3OTM2Nn0.HZkqtcr-XC0k2QwTtOjvzjemGVYpcfoVcB9zVP09ab4'
+        'apikey': result.supabaseKey // Use stored key, not hardcoded
       },
       body: JSON.stringify({
         job_description: jobDescription,

@@ -1,10 +1,28 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
+
+// Input validation schemas
+const contactInfoSchema = z.object({
+  name: z.string().max(100).optional(),
+  email: z.string().email().max(255).optional(),
+  phone: z.string().max(20).optional(),
+  linkedin: z.string().url().max(500).optional(),
+}).optional()
+
+const generateContentSchema = z.object({
+  job_description: z.string().min(10).max(50000),
+  session_id: z.string().uuid(),
+  original_resume: z.string().min(10).max(100000),
+  template: z.enum(['modern', 'classic', 'creative', 'minimal']).optional(),
+  contact_info: contactInfoSchema,
+  include_cover_letter: z.boolean().optional()
+})
 
 // Rate limiting
 const requestCounts = new Map<string, { count: number; timestamp: number }>()
@@ -47,18 +65,11 @@ serve(async (req) => {
   }
 
   try {
-    const { job_description, session_id, original_resume, template, contact_info, include_cover_letter } = await req.json()
+    // Parse and validate input with Zod
+    const rawBody = await req.json()
+    const validatedInput = generateContentSchema.parse(rawBody)
     
-    // Input validation
-    if (!job_description || job_description.length > 50000) {
-      throw new Error('Invalid job description length')
-    }
-    if (!session_id || session_id.length > 100) {
-      throw new Error('Invalid session ID')
-    }
-    if (!original_resume || original_resume.length > 100000) {
-      throw new Error('Invalid resume length')
-    }
+    const { job_description, session_id, original_resume, template, contact_info, include_cover_letter } = validatedInput
 
     // Initialize Supabase client with Service Role
     const supabase = createClient(

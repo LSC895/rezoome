@@ -1,7 +1,7 @@
 project_id = "wmqtvnurwoispusqlsgw"
 
 [functions.generate-content]
-verify_jwt = false
+verify_jwt = true
 
 [functions.parse-document]
-verify_jwt = false
+verify_jwt = true

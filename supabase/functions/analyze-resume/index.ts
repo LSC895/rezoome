@@ -1,11 +1,20 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
+
+// Input validation schema
+const analyzeResumeSchema = z.object({
+  file_content: z.string().min(10).max(100000),
+  file_name: z.string().min(1).max(255),
+  file_size: z.number().min(1).max(10485760), // 10MB max
+  session_id: z.string().uuid()
+})
 
 // Rate limiting
 const requestCounts = new Map<string, { count: number; timestamp: number }>()
@@ -48,21 +57,11 @@ serve(async (req) => {
   }
 
   try {
-    const { file_content, file_name, file_size, session_id } = await req.json()
-
-    // Input validation
-    if (!file_content || file_content.length > 100000) {
-      throw new Error('Invalid file content length')
-    }
-    if (!file_name || file_name.length > 255) {
-      throw new Error('Invalid file name')
-    }
-    if (!file_size || file_size > 10 * 1024 * 1024) {
-      throw new Error('File size exceeds 10MB limit')
-    }
-    if (!session_id || session_id.length > 100) {
-      throw new Error('Invalid session ID')
-    }
+    // Parse and validate input with Zod
+    const rawBody = await req.json()
+    const validatedInput = analyzeResumeSchema.parse(rawBody)
+    
+    const { file_content, file_name, file_size, session_id } = validatedInput
 
     // Initialize Supabase client
     const supabase = createClient(
