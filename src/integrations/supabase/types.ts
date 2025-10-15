@@ -10,117 +10,17 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "13.0.4"
+    PostgrestVersion: "13.0.5"
   }
   public: {
     Tables: {
-      generated_resumes: {
-        Row: {
-          ats_optimization_score: number | null
-          contact_info: Json | null
-          cover_letter: string | null
-          created_at: string
-          generated_content: string
-          id: string
-          job_description: string
-          session_id: string
-          template: string | null
-        }
-        Insert: {
-          ats_optimization_score?: number | null
-          contact_info?: Json | null
-          cover_letter?: string | null
-          created_at?: string
-          generated_content: string
-          id?: string
-          job_description: string
-          session_id: string
-          template?: string | null
-        }
-        Update: {
-          ats_optimization_score?: number | null
-          contact_info?: Json | null
-          cover_letter?: string | null
-          created_at?: string
-          generated_content?: string
-          id?: string
-          job_description?: string
-          session_id?: string
-          template?: string | null
-        }
-        Relationships: []
-      }
-      resume_analyses: {
-        Row: {
-          ats_score: number
-          created_at: string
-          file_name: string
-          file_size: number
-          id: string
-          overall_feedback: string
-          sections: Json
-          session_id: string
-        }
-        Insert: {
-          ats_score: number
-          created_at?: string
-          file_name: string
-          file_size: number
-          id?: string
-          overall_feedback: string
-          sections?: Json
-          session_id: string
-        }
-        Update: {
-          ats_score?: number
-          created_at?: string
-          file_name?: string
-          file_size?: number
-          id?: string
-          overall_feedback?: string
-          sections?: Json
-          session_id?: string
-        }
-        Relationships: []
-      }
-      user_sessions: {
-        Row: {
-          created_at: string
-          id: string
-          last_activity: string
-          session_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          last_activity?: string
-          session_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          last_activity?: string
-          session_id?: string
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      cleanup_old_sessions: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      set_session_context: {
-        Args: { session_id_param: string }
-        Returns: undefined
-      }
-      validate_session_access: {
-        Args: { table_session_id: string }
-        Returns: boolean
-      }
+      [_ in never]: never
     }
     Enums: {
       [_ in never]: never

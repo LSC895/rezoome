@@ -1,7 +1,1 @@
-project_id = "wmqtvnurwoispusqlsgw"
-
-[functions.generate-content]
-verify_jwt = true
-
-[functions.parse-document]
-verify_jwt = true
+project_id = "pilqtogxuqjtrxnthxzn"
