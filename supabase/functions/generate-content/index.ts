@@ -1,345 +1,270 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts'
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.0";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+};
 
 // Input validation schemas
 const contactInfoSchema = z.object({
-  name: z.string().max(100).optional(),
-  email: z.string().email().max(255).optional(),
-  phone: z.string().max(20).optional(),
-  linkedin: z.string().url().max(500).optional(),
-}).optional()
+  name: z.string().optional(),
+  email: z.string().email().optional(),
+  phone: z.string().optional(),
+  linkedin: z.string().optional(),
+}).optional();
 
 const generateContentSchema = z.object({
-  job_description: z.string().min(10).max(50000),
-  session_id: z.string().uuid(),
-  original_resume: z.string().min(10).max(100000),
-  template: z.enum(['modern', 'classic', 'creative', 'minimal']).optional(),
+  job_description: z.string().min(10).max(10000),
+  original_resume: z.string().min(10).max(50000),
+  template: z.enum(['professional', 'modern', 'creative', 'classic']).optional(),
   contact_info: contactInfoSchema,
-  include_cover_letter: z.boolean().optional()
-})
+  include_cover_letter: z.boolean().optional(),
+});
 
 // Rate limiting
-const requestCounts = new Map<string, { count: number; timestamp: number }>()
-const RATE_LIMIT = 30 // Max 30 requests per minute
-const RATE_WINDOW = 60000
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+const RATE_LIMIT = 10;
+const RATE_WINDOW = 60000; // 1 minute
 
 function checkRateLimit(clientId: string): boolean {
-  const now = Date.now()
-  const record = requestCounts.get(clientId)
-  
-  if (!record || now - record.timestamp > RATE_WINDOW) {
-    requestCounts.set(clientId, { count: 1, timestamp: now })
-    return true
+  const now = Date.now();
+  const clientData = rateLimitMap.get(clientId);
+
+  if (!clientData || now > clientData.resetTime) {
+    rateLimitMap.set(clientId, { count: 1, resetTime: now + RATE_WINDOW });
+    return true;
   }
-  
-  if (record.count >= RATE_LIMIT) {
-    return false
+
+  if (clientData.count >= RATE_LIMIT) {
+    return false;
   }
-  
-  record.count++
-  return true
+
+  clientData.count++;
+  return true;
 }
 
 serve(async (req) => {
+  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
-  }
-
-  // Rate limiting
-  const clientId = req.headers.get('x-forwarded-for') || 'unknown'
-  if (!checkRateLimit(clientId)) {
-    console.warn(`Rate limit exceeded for client: ${clientId}`)
-    return new Response(
-      JSON.stringify({ error: 'Too many requests. Please try again in a minute.' }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 429 
-      }
-    )
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Parse and validate input with Zod
-    const rawBody = await req.json()
-    const validatedInput = generateContentSchema.parse(rawBody)
+    // Rate limiting
+    const clientIp = req.headers.get('x-forwarded-for') || 'unknown';
+    if (!checkRateLimit(clientIp)) {
+      return new Response(
+        JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Get and validate auth token
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Missing authorization header' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Initialize Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    });
+
+    // Verify user from JWT
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
     
-    const { job_description, session_id, original_resume, template, contact_info, include_cover_letter } = validatedInput
+    if (userError || !user) {
+      console.error('Auth error:', userError);
+      return new Response(
+        JSON.stringify({ error: 'Invalid authentication token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
-    // Initialize Supabase client with Service Role
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
+    // Parse and validate input
+    const body = await req.json();
+    const validatedData = generateContentSchema.parse(body);
 
-    // Get Gemini API key from secrets
-    const geminiApiKey = Deno.env.get('GEMINI_API_KEY')
+    // Get Gemini API key
+    const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
     if (!geminiApiKey) {
-      throw new Error('Gemini API key not configured')
+      throw new Error('GEMINI_API_KEY not configured');
     }
 
-    console.log('Generating tailored content with Gemini API...')
-
-    // Enhanced template-specific styling
+    // Build prompt
     const templateStyles = {
-      modern: {
-        colors: 'Use blue (#2563eb) for headers and accents. Clean, minimalist design.',
-        format: 'Modern formatting with clean lines and subtle borders.'
-      },
-      classic: {
-        colors: 'Use green (#059669) for headers and accents. Traditional, professional design.',
-        format: 'Classic formatting with clear sections and professional structure.'
-      },
-      creative: {
-        colors: 'Use purple (#9333ea) for headers and accents. Creative, modern design.',
-        format: 'Creative formatting with dynamic sections and modern styling.'
-      }
-    }
+      professional: 'Use a clean, traditional format with clear sections and professional language.',
+      modern: 'Use a contemporary format with strategic use of formatting and impactful language.',
+      creative: 'Use an innovative format that showcases personality while maintaining professionalism.',
+      classic: 'Use a traditional, time-tested format with conservative styling and formal language.',
+    };
 
-    const selectedStyle = templateStyles[template as keyof typeof templateStyles] || templateStyles.modern
+    const templateStyle = templateStyles[validatedData.template || 'modern'];
 
-    // Extract contact info from resume text if not provided
-    let finalContactInfo = contact_info;
-    if (!contact_info?.name || !contact_info?.email) {
-      console.log('Contact info incomplete, extracting from resume text...');
-      
-      // Extract email
-      const emailMatch = original_resume.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
-      const phoneMatch = original_resume.match(/(?:\+?1[-.\s]?)?\(?[0-9]{3}\)?[-.\s]?[0-9]{3}[-.\s]?[0-9]{4}/);
-      const linkedinMatch = original_resume.match(/(?:https?:\/\/)?(?:www\.)?linkedin\.com\/in\/[a-zA-Z0-9-]+\/?/i);
-      
-      // Extract name from first few lines
-      const lines = original_resume.split('\n').map(line => line.trim()).filter(line => line.length > 0);
-      let extractedName = '';
-      
-      for (const line of lines.slice(0, 10)) {
-        if (line.toLowerCase().includes('resume') || 
-            line.toLowerCase().includes('cv') || 
-            line.includes('@') ||
-            /^\+?[\d\s\-\(\)]+$/.test(line)) {
+    const systemPrompt = `You are an expert resume writer and ATS optimization specialist. Your task is to tailor resumes to specific job descriptions while maintaining authenticity and optimizing for Applicant Tracking Systems.
+
+Key requirements:
+1. Analyze the job description for required skills, experience, and keywords
+2. Restructure and rewrite the resume to highlight relevant experience
+3. Use strong action verbs and quantifiable achievements
+4. Incorporate job-specific keywords naturally
+5. Maintain professional formatting suitable for ATS parsing
+6. ${templateStyle}
+7. Keep the same core experiences but emphasize relevant aspects`;
+
+    const userPrompt = `Job Description:
+${validatedData.job_description}
+
+Original Resume:
+${validatedData.original_resume}
+
+${validatedData.contact_info ? `Contact Information:
+Name: ${validatedData.contact_info.name || 'Not provided'}
+Email: ${validatedData.contact_info.email || 'Not provided'}
+Phone: ${validatedData.contact_info.phone || 'Not provided'}
+LinkedIn: ${validatedData.contact_info.linkedin || 'Not provided'}` : ''}
+
+Please generate:
+1. An ATS-optimized, tailored resume that highlights relevant experience for this position
+${validatedData.include_cover_letter ? '2. A compelling cover letter (max 400 words) that connects the candidate\'s experience to the role' : ''}
+
+Return your response as valid JSON in this exact format:
+{
+  "resume": "The full tailored resume content here",
+  "cover_letter": ${validatedData.include_cover_letter ? '"The cover letter content here"' : 'null'},
+  "ats_score": 85,
+  "contact_info": {
+    "name": "Full Name",
+    "email": "email@example.com",
+    "phone": "+1234567890",
+    "linkedin": "linkedin.com/in/profile"
+  }
+}`;
+
+    // Call Gemini API with retry logic
+    let attempts = 0;
+    let geminiResponse;
+    
+    while (attempts < 3) {
+      try {
+        geminiResponse = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${geminiApiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{
+                parts: [
+                  { text: systemPrompt },
+                  { text: userPrompt }
+                ]
+              }],
+              generationConfig: {
+                temperature: 0.7,
+                maxOutputTokens: 4096,
+              },
+            }),
+          }
+        );
+
+        if (geminiResponse.status === 503) {
+          attempts++;
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempts));
           continue;
         }
-        
-        const namePattern = /^[A-Z][a-zA-Z''-]*(?:\s+[A-Z][a-zA-Z''-]*){1,3}$/;
-        if (namePattern.test(line) && line.length < 50) {
-          extractedName = line;
-          break;
-        }
+
+        break;
+      } catch (error) {
+        attempts++;
+        if (attempts >= 3) throw error;
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempts));
       }
-      
-      finalContactInfo = {
-        name: contact_info?.name || extractedName || 'Professional Name',
-        email: contact_info?.email || (emailMatch ? emailMatch[0] : 'professional@email.com'),
-        phone: contact_info?.phone || (phoneMatch ? phoneMatch[0] : '(555) 123-4567'),
-        linkedin: contact_info?.linkedin || (linkedinMatch ? (linkedinMatch[0].startsWith('http') ? linkedinMatch[0] : `https://${linkedinMatch[0]}`) : 'https://linkedin.com/in/professional')
-      };
     }
 
-    // Build comprehensive prompt for high-quality resume generation
-    let promptText = `You are a world-class resume writer and career strategist with 20+ years of experience helping executives and professionals land their dream jobs at top companies. Generate an exceptional, ATS-optimized resume that will get past automated systems and impress hiring managers.
-
-CONTACT INFORMATION TO USE (NEVER use placeholders - these are the actual details):
-Name: ${finalContactInfo.name}
-Phone: ${finalContactInfo.phone}
-Email: ${finalContactInfo.email}
-LinkedIn: ${finalContactInfo.linkedin}
-
-MASTER RESUME CONTENT TO WORK WITH:
-${original_resume || 'No master resume provided'}
-
-TARGET JOB DESCRIPTION:
-${job_description}
-
-TEMPLATE STYLE: ${template.toUpperCase()}
-Design Guidelines: ${selectedStyle.colors} ${selectedStyle.format}
-
-CRITICAL RESUME WRITING INSTRUCTIONS:
-
-1. **STRATEGIC CONTENT TAILORING**:
-   - Analyze the job description thoroughly to identify key requirements, skills, and keywords
-   - Reposition and prioritize experiences from the master resume that directly match job requirements
-   - Quantify ALL achievements with specific numbers, percentages, dollar amounts, or metrics
-   - Use powerful action verbs (Spearheaded, Orchestrated, Optimized, Transformed, etc.)
-   
-2. **ATS OPTIMIZATION**:
-   - Incorporate exact keywords and phrases from job description naturally throughout
-   - Use standard section headers (PROFESSIONAL SUMMARY, EXPERIENCE, EDUCATION, SKILLS)
-   - Avoid graphics, tables, or unusual formatting that ATS can't read
-   - Include both acronyms and full terms (e.g., "API (Application Programming Interface)")
-
-3. **PROFESSIONAL SUMMARY** (3-4 lines):
-   - Lead with years of experience and primary expertise area
-   - Highlight 2-3 most relevant achievements with quantifiable results
-   - Include key skills that match job requirements
-   - End with value proposition for the target role
-
-4. **EXPERIENCE SECTION**:
-   - List experiences in reverse chronological order
-   - For each role, include: Job Title | Company | Location | Dates
-   - Write 3-5 bullet points per role focusing on achievements, not duties
-   - Use the CAR method: Challenge/Action/Result
-   - Start each bullet with strong action verbs
-   - Include metrics wherever possible (improved efficiency by 30%, managed team of 15, increased revenue by $2M)
-
-5. **SKILLS SECTION**:
-   - Prioritize technical skills mentioned in job description
-   - Group related skills logically (Technical Skills, Programming Languages, Tools & Platforms)
-   - Match skill level terminology used in job posting
-
-6. **EDUCATION & CERTIFICATIONS**:
-   - Include relevant degrees, certifications, and training
-   - Highlight any education/certs specifically mentioned in job description
-   - Include GPA if 3.7+ and recent graduate
-
-7. **FORMATTING REQUIREMENTS**:
-   - Use ALL CAPS for main section headers (PROFESSIONAL SUMMARY, EXPERIENCE, EDUCATION, SKILLS)
-   - For job entries, use format: Job Title | Company | Location | Date Range
-   - Use bullet points (•) for all achievement lists
-   - Leave blank lines between sections for clear separation
-   - Keep consistent formatting throughout
-   - Focus on content structure that will be beautifully styled by the application
-
-**OUTPUT FORMAT REQUIREMENTS**:
-- Start each major section with ALL CAPS header
-- Use consistent bullet point formatting
-- Include actual contact information (no placeholders)
-- Ensure all content is from the master resume but optimized for the target job
-- Make it comprehensive but concise (1-2 pages worth of content)
-
-**QUALITY STANDARDS**:
-- Every bullet point must demonstrate impact and value
-- No generic responsibilities - focus on unique contributions
-- Perfect grammar, spelling, and formatting
-- Compelling narrative that shows career progression
-- Strong alignment between candidate's experience and job requirements`
-
-    if (include_cover_letter) {
-      promptText += `
-
-8. **COVER LETTER REQUIREMENTS**:
-   - Professional business letter format with proper greeting
-   - Opening paragraph: Hook with specific interest in company/role
-   - Body paragraphs: 2-3 specific examples showing qualification alignment
-   - Closing: Strong call-to-action and enthusiasm
-   - Professional, confident tone throughout
-   - Complement resume without repeating it verbatim
-   - Address company's specific needs mentioned in job description
-   - Show knowledge of company culture, mission, or recent news`
+    if (!geminiResponse || !geminiResponse.ok) {
+      const errorText = await geminiResponse?.text();
+      console.error('Gemini API error:', errorText);
+      throw new Error('Failed to generate content with AI');
     }
 
-    promptText += `
+    const geminiData = await geminiResponse.json();
+    const generatedText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
 
-MANDATORY OUTPUT FORMAT - Return valid JSON only:
-{
-  "resume": "Complete professional resume in clean markdown format with proper headers, bullet points, and formatting. Must be exceptionally well-written and ATS-optimized.",
-  ${include_cover_letter ? '"cover_letter": "Professional cover letter in business format addressing the specific role and company",' : ''}
-  "contact_extracted": {
-    "name": "Full professional name",
-    "phone": "Phone number in standard format",
-    "email": "Professional email address", 
-    "linkedin": "Complete LinkedIn URL"
-  }
-}
-
-CRITICAL: Generate an outstanding resume that showcases the candidate as the perfect fit for this specific role. Every word should add value and demonstrate why they're the ideal hire.`
-
-    // Call Gemini API
-    const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${geminiApiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: promptText }] }],
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 4000
-        }
-      })
-    })
-
-    if (!geminiResponse.ok) {
-      throw new Error(`Gemini API error: ${geminiResponse.status}`)
+    if (!generatedText) {
+      throw new Error('No content generated from AI');
     }
 
-    const geminiData = await geminiResponse.json()
-    console.log('Gemini response received')
-
-    if (!geminiData.candidates?.[0]?.content?.parts?.[0]?.text) {
-      throw new Error('Invalid response from Gemini API')
-    }
-
-    let generatedContent = geminiData.candidates[0].content.parts[0].text
-    
-    // Clean up the response to extract JSON
-    generatedContent = generatedContent.replace(/```json\n?/g, '').replace(/```\n?/g, '')
-    
-    let parsedContent
+    // Parse AI response
+    let parsedContent;
     try {
-      parsedContent = JSON.parse(generatedContent)
-    } catch (parseError) {
-      // Fallback if JSON parsing fails
-      parsedContent = {
-        resume: generatedContent,
-        cover_letter: include_cover_letter ? "Cover letter could not be generated in this format. Please try again." : undefined,
-        contact_extracted: contact_info
+      const jsonMatch = generatedText.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('No JSON found in response');
       }
+      parsedContent = JSON.parse(jsonMatch[0]);
+    } catch (parseError) {
+      console.error('Failed to parse AI response:', parseError);
+      throw new Error('Failed to parse AI response');
     }
 
-    // Store the generated content in the database
-    const { data, error } = await supabase
+    // Store in database
+    const { data: insertData, error: insertError } = await supabase
       .from('generated_resumes')
       .insert({
-        session_id,
-        job_description,
+        user_id: user.id,
+        job_description: validatedData.job_description,
         generated_content: parsedContent.resume,
-        cover_letter: parsedContent.cover_letter || null,
-        template: template,
-        contact_info: finalContactInfo,
-        ats_optimization_score: 94
+        cover_letter: parsedContent.cover_letter,
+        contact_info: parsedContent.contact_info,
+        template: validatedData.template || 'modern',
+        ats_optimization_score: parsedContent.ats_score,
       })
       .select()
-      .single()
+      .single();
 
-    if (error) {
-      console.error('Database error:', error)
-      throw error
+    if (insertError) {
+      console.error('Database insert error:', insertError);
+      throw new Error('Failed to save generated content');
     }
-
-    console.log('Generated content stored successfully:', data.id)
 
     return new Response(
       JSON.stringify({
-        success: true,
         resume: {
-          id: data.id,
+          id: insertData.id,
           content: parsedContent.resume,
           cover_letter: parsedContent.cover_letter,
-          contact_info: finalContactInfo,
-          template: template,
-          ats_score: 94
+          contact_info: parsedContent.contact_info,
+          ats_score: parsedContent.ats_score,
+          template: insertData.template,
         }
       }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      }
-    )
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
 
   } catch (error) {
-    console.error('Error in generate-content function:', error)
+    console.error('Error in generate-content:', error);
+    
+    if (error instanceof z.ZodError) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid input', details: error.errors }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     return new Response(
-      JSON.stringify({ 
-        error: error.message,
-        details: 'Please try again with your job description.'
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500,
-      }
-    )
+      JSON.stringify({ error: error.message || 'Internal server error' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
   }
-})
+});

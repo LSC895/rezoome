@@ -4,27 +4,16 @@ import FileUpload from '@/components/FileUpload';
 import ResumeGenerator from '@/components/ResumeGenerator';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { useSession } from '@/hooks/useSession';
 import { Link, useNavigate } from 'react-router-dom';
 import { SignedIn, SignedOut, UserButton, RedirectToSignIn } from '@clerk/clerk-react';
 
 const Home = () => {
   const [currentStep, setCurrentStep] = useState('upload');
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
-  const { sessionId, isLoading: sessionLoading } = useSession();
   const { toast } = useToast();
   const navigate = useNavigate();
 
   const handleFileSelect = async (file: File) => {
-    if (!sessionId) {
-      toast({
-        title: "Session Error",
-        description: "Please refresh the page and try again.",
-        variant: "destructive"
-      });
-      return;
-    }
-
     setUploadedFile(file);
     setCurrentStep('generator');
   };
@@ -107,11 +96,7 @@ const Home = () => {
 
                 {/* Upload Section */}
                 <div className="max-w-lg mx-auto">
-                  {sessionLoading ? (
-                    <div className="text-center text-gray-600">Loading...</div>
-                  ) : (
-                    <FileUpload onFileSelect={handleFileSelect} isLoading={false} />
-                  )}
+                  <FileUpload onFileSelect={handleFileSelect} isLoading={false} />
                 </div>
               </div>
             </div>

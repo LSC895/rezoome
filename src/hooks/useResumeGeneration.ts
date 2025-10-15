@@ -1,5 +1,3 @@
-
-// Updated hook to support new generation parameters
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -27,7 +25,6 @@ export const useResumeGeneration = () => {
 
   const generateResume = async (
     jobDescription: string, 
-    sessionId: string, 
     template: string = 'modern',
     contactInfo?: ContactInfo,
     includeCoverLetter: boolean = false
@@ -35,16 +32,12 @@ export const useResumeGeneration = () => {
     setIsGenerating(true);
     
     try {
-      // Set session context for RLS policies
-      await supabase.rpc('set_session_context', { session_id_param: sessionId });
-
       // Get original resume content from localStorage
       const originalResume = localStorage.getItem('originalResumeContent') || '';
       
       const { data, error } = await supabase.functions.invoke('generate-content', {
         body: {
           job_description: jobDescription,
-          session_id: sessionId,
           original_resume: originalResume,
           template: template,
           contact_info: contactInfo,

@@ -1,227 +1,211 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+};
 
-// Rate limiting: Track requests by IP
-const requestCounts = new Map<string, { count: number; timestamp: number }>()
-const RATE_LIMIT = 10 // Max requests per minute
-const RATE_WINDOW = 60000 // 1 minute in milliseconds
+// Rate limiting
+const requestCounts = new Map<string, { count: number; timestamp: number }>();
+const RATE_LIMIT = 10;
+const RATE_WINDOW = 60000; // 1 minute
 
 function checkRateLimit(clientId: string): boolean {
-  const now = Date.now()
-  const record = requestCounts.get(clientId)
-  
+  const now = Date.now();
+  const record = requestCounts.get(clientId);
+
   if (!record || now - record.timestamp > RATE_WINDOW) {
-    requestCounts.set(clientId, { count: 1, timestamp: now })
-    return true
+    requestCounts.set(clientId, { count: 1, timestamp: now });
+    return true;
   }
-  
+
   if (record.count >= RATE_LIMIT) {
-    return false
+    return false;
   }
-  
-  record.count++
-  return true
+
+  record.count++;
+  return true;
 }
 
-// Cache for parsed documents
-const documentCache = new Map<string, { text: string; timestamp: number }>()
-const CACHE_DURATION = 300000 // 5 minutes
+// Document cache
+const documentCache = new Map<string, { text: string; timestamp: number }>();
+const CACHE_DURATION = 300000; // 5 minutes
 
 serve(async (req) => {
+  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
-  }
-
-  // Rate limiting
-  const clientId = req.headers.get('x-forwarded-for') || 'unknown'
-  if (!checkRateLimit(clientId)) {
-    console.warn(`Rate limit exceeded for client: ${clientId}`)
-    return new Response(
-      JSON.stringify({ error: 'Too many requests. Please try again later.' }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 429 
-      }
-    )
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const formData = await req.formData()
-    const file = formData.get('file') as File
-    
+    // Rate limiting
+    const clientIp = req.headers.get('x-forwarded-for') || 'unknown';
+    if (!checkRateLimit(clientIp)) {
+      return new Response(
+        JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Verify authentication
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Missing authorization header' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Parse form data
+    const formData = await req.formData();
+    const file = formData.get('file') as File;
+
     if (!file) {
-      throw new Error('No file provided')
+      return new Response(
+        JSON.stringify({ error: 'No file provided' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // Validate file size (max 10MB)
     if (file.size > 10 * 1024 * 1024) {
-      throw new Error('File size exceeds 10MB limit')
+      return new Response(
+        JSON.stringify({ error: 'File too large. Maximum size is 10MB.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
-    // Validate file name length
+    // Validate file name
     if (file.name.length > 255) {
-      throw new Error('File name too long')
+      return new Response(
+        JSON.stringify({ error: 'File name too long' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
-    // Create cache key
-    const cacheKey = `${file.name}-${file.size}`
-    
-    // Check cache first
-    const cached = documentCache.get(cacheKey)
-    if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-      console.log(`Serving cached result for: ${file.name}`)
+    // Check cache
+    const cacheKey = `${file.name}-${file.size}`;
+    const cached = documentCache.get(cacheKey);
+    const now = Date.now();
+
+    if (cached && now - cached.timestamp < CACHE_DURATION) {
       return new Response(
         JSON.stringify({
-          success: true,
-          extractedText: cached.text,
+          text: cached.text,
           fileName: file.name,
           fileSize: file.size,
-          cached: true
+          cached: true,
         }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        }
-      )
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
-    console.log(`Parsing document: ${file.name}, type: ${file.type}, size: ${file.size}`)
+    let extractedText = '';
+    const fileName = file.name.toLowerCase();
 
-    // Get file extension
-    const fileName = file.name.toLowerCase()
-    const isTextFile = fileName.endsWith('.txt') || fileName.endsWith('.md')
-    
-    let extractedText = ''
+    // Handle text-based files
+    if (fileName.endsWith('.txt') || fileName.endsWith('.md')) {
+      extractedText = await file.text();
+    }
+    // Handle PDF files
+    else if (fileName.endsWith('.pdf')) {
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const uint8Array = new Uint8Array(arrayBuffer);
+        
+        // Basic PDF text extraction
+        const decoder = new TextDecoder('utf-8');
+        let rawText = decoder.decode(uint8Array);
+        
+        // Simple text extraction (looking for text between stream/endstream)
+        const textMatches = rawText.match(/BT\s+(.*?)\s+ET/gs);
+        if (textMatches && textMatches.length > 0) {
+          extractedText = textMatches
+            .map(match => match.replace(/BT\s+|\s+ET/g, ''))
+            .join('\n');
+        }
 
-    if (isTextFile) {
-      // For text files, read directly
-      extractedText = await file.text()
-    } else if (fileName.endsWith('.pdf')) {
-      // For PDF files, we'll implement a basic text extraction
-      // In production, you'd want to use a proper PDF parsing library
-      const arrayBuffer = await file.arrayBuffer()
-      const text = new TextDecoder().decode(arrayBuffer)
-      
-      // Simple PDF text extraction (very basic)
-      // This is a placeholder - for production use a proper PDF parser
-      const pdfTextMatch = text.match(/\/Length\s+\d+\s*>>\s*stream\s*([\s\S]*?)\s*endstream/g)
-      if (pdfTextMatch) {
-        extractedText = pdfTextMatch
-          .map(match => match.replace(/\/Length\s+\d+\s*>>\s*stream\s*/, '').replace(/\s*endstream/, ''))
-          .join('\n')
-          .replace(/[^\x20-\x7E\n]/g, ' ') // Remove non-printable characters
-          .replace(/\s+/g, ' ')
-          .trim()
-      }
-      
-      if (!extractedText || extractedText.length < 50) {
-        // Fallback for PDFs that can't be parsed
-        extractedText = `Professional Resume
+        // Fallback if extraction failed
+        if (!extractedText || extractedText.length < 50) {
+          extractedText = `Resume Template
+
+[Your Name]
+[Your Email] | [Your Phone] | [Your LinkedIn]
 
 PROFESSIONAL SUMMARY
-Experienced professional with a strong background in [your field]. Proven track record of success in [key areas]. Seeking opportunities to leverage skills and experience in a challenging role.
+[Brief overview of your professional background and key strengths]
 
-EXPERIENCE
-[Your Previous Role] - [Company Name] ([Start Date] - [End Date])
-• [Key achievement or responsibility]
-• [Key achievement or responsibility]
-• [Key achievement or responsibility]
-
-[Another Previous Role] - [Company Name] ([Start Date] - [End Date])
-• [Key achievement or responsibility]
-• [Key achievement or responsibility]
+WORK EXPERIENCE
+[Company Name] - [Job Title]
+[Start Date] - [End Date]
+• [Key responsibility or achievement]
+• [Key responsibility or achievement]
+• [Key responsibility or achievement]
 
 EDUCATION
-[Degree] in [Field] - [University Name] ([Year])
+[Degree] in [Field of Study]
+[University Name] - [Graduation Year]
 
 SKILLS
 • [Skill 1]
 • [Skill 2]
-• [Skill 3]
-• [Skill 4]
-
-Note: This is a template. Please replace with your actual information from the uploaded resume file: ${file.name}`
+• [Skill 3]`;
+        }
+      } catch (error) {
+        console.error('PDF parsing error:', error);
+        extractedText = 'Unable to parse PDF. Please provide a text-based resume.';
       }
-    } else {
-      // For other file types, provide a template
-      extractedText = `Professional Resume Template
+    }
+    // Unsupported file types
+    else {
+      extractedText = `Resume Template
+
+[Your Name]
+[Your Email] | [Your Phone] | [Your LinkedIn]
 
 PROFESSIONAL SUMMARY
-Experienced professional with expertise in [your industry/field]. Demonstrated success in [key areas]. Looking to contribute skills and experience to a dynamic organization.
+[Brief overview of your professional background and key strengths]
 
 WORK EXPERIENCE
-Senior [Your Role] - [Company Name] ([Start Date] - [End Date])
-• [Achievement with quantifiable results]
-• [Key responsibility that shows impact]
-• [Technical or leadership accomplishment]
-
-[Previous Role] - [Company Name] ([Start Date] - [End Date])
-• [Relevant achievement]
-• [Project or initiative you led]
-• [Skills demonstrated]
+[Company Name] - [Job Title]
+[Start Date] - [End Date]
+• [Key responsibility or achievement]
+• [Key responsibility or achievement]
 
 EDUCATION
-[Degree] in [Field of Study] - [University Name] ([Graduation Year])
-• [Relevant coursework, honors, or activities]
+[Degree] in [Field of Study]
+[University Name] - [Graduation Year]
 
-TECHNICAL SKILLS
-• [Programming languages/tools]
-• [Software/platforms]
-• [Industry-specific skills]
-• [Certifications]
-
-ACHIEVEMENTS
-• [Professional accomplishment]
-• [Award or recognition]
-• [Certification or training]
-
-Note: Template created from uploaded file: ${file.name}. Please customize with your actual information.`
+SKILLS
+• [Skill 1]
+• [Skill 2]`;
     }
 
-    console.log(`Extracted ${extractedText.length} characters from ${file.name}`)
-
     // Cache the result
-    documentCache.set(cacheKey, { text: extractedText, timestamp: Date.now() })
-    
-    // Clean old cache entries
+    documentCache.set(cacheKey, { text: extractedText, timestamp: now });
+
+    // Clean up old cache entries
     if (documentCache.size > 100) {
-      const now = Date.now()
-      for (const [key, value] of documentCache.entries()) {
-        if (now - value.timestamp > CACHE_DURATION) {
-          documentCache.delete(key)
-        }
-      }
+      const entries = Array.from(documentCache.entries());
+      entries.sort((a, b) => a[1].timestamp - b[1].timestamp);
+      entries.slice(0, 20).forEach(([key]) => documentCache.delete(key));
     }
 
     return new Response(
       JSON.stringify({
-        success: true,
-        extractedText: extractedText,
+        text: extractedText,
         fileName: file.name,
         fileSize: file.size,
-        cached: false
+        cached: false,
       }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      }
-    )
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
 
   } catch (error) {
-    console.error('Error in parse-document function:', error)
+    console.error('Error in parse-document:', error);
     return new Response(
-      JSON.stringify({ 
-        error: error.message,
-        details: 'Failed to parse document. Please try again or use a text file.'
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500,
-      }
-    )
+      JSON.stringify({ error: error.message || 'Internal server error' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
   }
-})
+});

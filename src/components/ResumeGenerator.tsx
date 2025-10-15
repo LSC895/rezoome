@@ -3,7 +3,6 @@ import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Wand2, FileText, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useResumeGeneration } from '@/hooks/useResumeGeneration';
-import { useSession } from '@/hooks/useSession';
 import { useContactExtraction } from '@/hooks/useContactExtraction';
 import { FormattedResume } from './FormattedResume';
 import ChromeExtensionPromo from './ChromeExtensionPromo';
@@ -28,7 +27,6 @@ const ResumeGenerator: React.FC<ResumeGeneratorProps> = ({ onBack, uploadedFile 
   const [isEditingResume, setIsEditingResume] = useState(false);
   
   const { generateResume, isGenerating, generatedResume } = useResumeGeneration();
-  const { sessionId } = useSession();
   const { contactInfo, setContactInfo, extractContactInfo } = useContactExtraction();
 
   // Store the uploaded file content for generation
@@ -154,10 +152,10 @@ SKILLS
   }, [isGenerating]);
 
   const handleGenerateResume = async () => {
-    if (!jobDescription.trim() || !sessionId) return;
+    if (!jobDescription.trim()) return;
     
     try {
-      await generateResume(jobDescription, sessionId, selectedTemplate, contactInfo, includeCoverLetter);
+      await generateResume(jobDescription, selectedTemplate, contactInfo, includeCoverLetter);
     } catch (error) {
       console.error('Failed to generate resume:', error);
     }
@@ -297,7 +295,7 @@ We are looking for a Senior Software Engineer with 3+ years of experience in Rea
           <div className="flex justify-center">
             <Button
               onClick={handleGenerateResume}
-              disabled={isGenerating || !jobDescription.trim() || !sessionId}
+              disabled={isGenerating || !jobDescription.trim()}
               size="lg"
               className="gradient-purple text-white font-sora font-bold text-xl py-4 px-8 rounded-2xl hover:opacity-90 transition-opacity"
             >

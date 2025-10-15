@@ -20,12 +20,15 @@ export const useResumeAnalysis = () => {
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const { toast } = useToast();
 
-  const analyzeResume = async (file: File, sessionId: string) => {
+  const analyzeResume = async (file: File) => {
     setIsAnalyzing(true);
     
     try {
-      // Set session context for RLS policies
-      await supabase.rpc('set_session_context', { session_id_param: sessionId });
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('You must be logged in to analyze resumes');
+      }
 
       // Convert file to base64 for API
       const fileContent = await new Promise<string>((resolve, reject) => {
@@ -40,7 +43,6 @@ export const useResumeAnalysis = () => {
           file_content: fileContent,
           file_name: file.name,
           file_size: file.size,
-          session_id: sessionId
         }
       });
 
