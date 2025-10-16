@@ -14,16 +14,135 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      generated_resumes: {
+        Row: {
+          ats_optimization_score: number | null
+          contact_info: Json | null
+          cover_letter: string | null
+          created_at: string
+          generated_content: string
+          id: string
+          job_description: string
+          template: string | null
+          user_id: string
+        }
+        Insert: {
+          ats_optimization_score?: number | null
+          contact_info?: Json | null
+          cover_letter?: string | null
+          created_at?: string
+          generated_content: string
+          id?: string
+          job_description: string
+          template?: string | null
+          user_id: string
+        }
+        Update: {
+          ats_optimization_score?: number | null
+          contact_info?: Json | null
+          cover_letter?: string | null
+          created_at?: string
+          generated_content?: string
+          id?: string
+          job_description?: string
+          template?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string | null
+          full_name: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      resume_analyses: {
+        Row: {
+          ats_score: number
+          created_at: string
+          file_name: string
+          file_size: number
+          id: string
+          overall_feedback: string
+          sections: Json | null
+          user_id: string
+        }
+        Insert: {
+          ats_score: number
+          created_at?: string
+          file_name: string
+          file_size: number
+          id?: string
+          overall_feedback: string
+          sections?: Json | null
+          user_id: string
+        }
+        Update: {
+          ats_score?: number
+          created_at?: string
+          file_name?: string
+          file_size?: number
+          id?: string
+          overall_feedback?: string
+          sections?: Json | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +269,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "user"],
+    },
   },
 } as const
