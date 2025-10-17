@@ -5,17 +5,11 @@ import ResumeGenerator from '@/components/ResumeGenerator';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Link, useNavigate } from 'react-router-dom';
-import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
-import { supabase } from '@/integrations/supabase/client';
+import { SignInButton, SignUpButton, UserButton, SignedIn, SignedOut } from '@clerk/clerk-react';
 
 
 const Index = () => {
   const navigate = useNavigate();
-  const { user } = useSupabaseAuth();
-
-  const signOut = async () => {
-    await supabase.auth.signOut();
-  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50">
@@ -32,17 +26,16 @@ const Index = () => {
                   Pricing
                 </Button>
               </Link>
-              {!user ? (
-                <Link to="/auth">
+              <SignedOut>
+                <SignInButton mode="modal">
                   <Button size="sm" className="text-sm bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700">
                     Sign in
                   </Button>
-                </Link>
-              ) : (
-                <Button onClick={signOut} variant="ghost" size="sm">
-                  Sign out
-                </Button>
-              )}
+                </SignInButton>
+              </SignedOut>
+              <SignedIn>
+                <UserButton />
+              </SignedIn>
               <a 
                 href="https://twitter.com" 
                 target="_blank" 
@@ -77,13 +70,14 @@ const Index = () => {
 
           {/* Get Started Section */}
           <div className="max-w-lg mx-auto">
-            {!user ? (
-              <Link to="/auth">
+            <SignedOut>
+              <SignInButton mode="modal">
                 <Button size="lg" className="text-lg px-8 py-6 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg">
                   Get Started - Sign In
                 </Button>
-              </Link>
-            ) : (
+              </SignInButton>
+            </SignedOut>
+            <SignedIn>
               <Button 
                 size="lg" 
                 className="text-lg px-8 py-6 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg"
@@ -91,7 +85,7 @@ const Index = () => {
               >
                 Start Creating Resume
               </Button>
-            )}
+            </SignedIn>
           </div>
 
           {/* Single Feature */}
