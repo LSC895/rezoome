@@ -64,54 +64,36 @@ serve(async (req) => {
       console.log('Created new user:', userId)
     }
 
-    // Generate a session token for the user
-    const { data: sessionData, error: sessionError } = await supabaseAdmin.auth.admin.generateLink({
+    // Generate a magic link and use the email_otp to create a server-side session
+    const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
       type: 'magiclink',
       email,
     })
 
-    if (sessionError) {
-      console.error('Error generating session:', sessionError)
-      throw sessionError
+    if (linkError) {
+      console.error('Error generating magic link:', linkError)
+      throw linkError
     }
 
-    // Create a proper session by signing in
+    const emailOtp = linkData?.properties?.email_otp
+    if (!emailOtp) {
+      throw new Error('Missing email_otp from generated magic link')
+    }
+
+    // Create a proper session by verifying the email OTP
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? ''
     )
 
-    // Use OTP to create session
-    const { data: otpData, error: otpError } = await supabaseAdmin.auth.admin.generateLink({
-      type: 'magiclink',
-      email,
-      options: {
-        redirectTo: `${req.headers.get('origin') || ''}/`
-      }
-    })
-
-    if (otpError) {
-      console.error('Error generating OTP:', otpError)
-      throw otpError
-    }
-
-    // Extract the token from the magic link
-    const url = new URL(otpData.properties.action_link)
-    const token = url.searchParams.get('token')
-    const tokenHash = url.searchParams.get('token_hash')
-
-    if (!token || !tokenHash) {
-      throw new Error('Failed to extract token from magic link')
-    }
-
-    // Verify the OTP and create session
     const { data: verifyData, error: verifyError } = await supabaseClient.auth.verifyOtp({
-      token_hash: tokenHash,
-      type: 'magiclink',
+      email,
+      token: emailOtp,
+      type: 'email',
     })
 
     if (verifyError) {
-      console.error('Error verifying OTP:', verifyError)
+      console.error('Error verifying email OTP:', verifyError)
       throw verifyError
     }
 
