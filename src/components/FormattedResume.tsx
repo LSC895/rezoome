@@ -19,7 +19,7 @@ interface ResumeSection {
 interface FormattedResumeProps {
   content: string;
   template: 'modern' | 'classic' | 'creative';
-  contactInfo: ContactInfo;
+  contactInfo?: ContactInfo;
   isEditing: boolean;
   onEditToggle: () => void;
   onSave: (content: string) => void;
@@ -201,40 +201,8 @@ export const FormattedResume: React.FC<FormattedResumeProps> = ({
 
       {/* Resume Container */}
       <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden max-w-4xl mx-auto">
-        {/* Header Section */}
-        <div className={`${colors.header} text-white p-8`}>
-          <div className="text-center space-y-4">
-            <h1 className="text-4xl font-bold font-sora">{contactInfo.name}</h1>
-            
-            <div className="flex flex-wrap justify-center gap-6 text-sm">
-              {contactInfo.phone && (
-                <div className="flex items-center space-x-2">
-                  <Phone className="h-4 w-4" />
-                  <span>{contactInfo.phone}</span>
-                </div>
-              )}
-              {contactInfo.email && (
-                <div className="flex items-center space-x-2">
-                  <Mail className="h-4 w-4" />
-                  <span>{contactInfo.email}</span>
-                </div>
-              )}
-              {contactInfo.linkedin && (
-                <div className="flex items-center space-x-2">
-                  <Linkedin className="h-4 w-4" />
-                  <span>LinkedIn Profile</span>
-                </div>
-              )}
-              {contactInfo.location && (
-                <div className="flex items-center space-x-2">
-                  <MapPin className="h-4 w-4" />
-                  <span>{contactInfo.location}</span>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
+        {/* Contact info is now extracted by AI and embedded in the resume content */}
+        
         {/* Content Sections */}
         <div className="p-8 space-y-8">
           {sections.map((section, index) => (

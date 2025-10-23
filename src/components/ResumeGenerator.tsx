@@ -8,7 +8,6 @@ import { FormattedResume } from './FormattedResume';
 import ChromeExtensionPromo from './ChromeExtensionPromo';
 import LoadingSkeleton from './LoadingSkeleton';
 import TemplateSelector from './TemplateSelector';
-import ContactInfoEditor from './ContactInfoEditor';
 import { supabase } from '@/integrations/supabase/client';
 
 interface ResumeGeneratorProps {
@@ -27,7 +26,6 @@ const ResumeGenerator: React.FC<ResumeGeneratorProps> = ({ onBack, uploadedFile 
   const [isEditingResume, setIsEditingResume] = useState(false);
   
   const { generateResume, isGenerating, generatedResume } = useResumeGeneration();
-  const { contactInfo, setContactInfo, extractContactInfo } = useContactExtraction();
 
   // Store the uploaded file content for generation
   useEffect(() => {
@@ -37,8 +35,6 @@ const ResumeGenerator: React.FC<ResumeGeneratorProps> = ({ onBack, uploadedFile 
     const applyContent = (text: string) => {
       if (isCancelled) return;
       localStorage.setItem('originalResumeContent', text);
-      const extracted = extractContactInfo(text);
-      setContactInfo(extracted);
       sessionStorage.setItem(`parsed:${parseKey}`, '1');
       console.log(`Stored content for ${uploadedFile.name}: ${text.length} characters`);
     };
@@ -115,12 +111,8 @@ SKILLS
       if (generatedResume.cover_letter) {
         setGeneratedCoverLetter(generatedResume.cover_letter);
       }
-      // Only update contact info if it's empty (don't overwrite user edits)
-      if (generatedResume.contact_info && !contactInfo.name && !contactInfo.email && !contactInfo.phone && !contactInfo.linkedin) {
-        setContactInfo(generatedResume.contact_info);
-      }
     }
-  }, [generatedResume, setContactInfo, contactInfo]);
+  }, [generatedResume]);
 
   // Loading progress simulation
   useEffect(() => {
@@ -155,7 +147,7 @@ SKILLS
     if (!jobDescription.trim()) return;
     
     try {
-      await generateResume(jobDescription, selectedTemplate, contactInfo, includeCoverLetter);
+      await generateResume(jobDescription, selectedTemplate, includeCoverLetter);
     } catch (error) {
       console.error('Failed to generate resume:', error);
     }
@@ -234,12 +226,6 @@ SKILLS
           <span className="font-medium">✓ Resume uploaded: {uploadedFile.name}</span>
         </div>
       </div>
-
-      {/* Contact Information Editor */}
-      <ContactInfoEditor 
-        contactInfo={contactInfo}
-        onContactInfoChange={setContactInfo}
-      />
 
       {/* Template Selection */}
       <div className="floating-card p-8 max-w-4xl mx-auto">
@@ -327,7 +313,6 @@ We are looking for a Senior Software Engineer with 3+ years of experience in Rea
             <FormattedResume
               content={editedResumeContent}
               template={selectedTemplate}
-              contactInfo={contactInfo}
               isEditing={isEditingResume}
               onEditToggle={handleEditToggle}
               onSave={handleSaveResume}

@@ -26,7 +26,6 @@ export const useResumeGeneration = () => {
   const generateResume = async (
     jobDescription: string, 
     template: string = 'modern',
-    contactInfo?: ContactInfo,
     includeCoverLetter: boolean = false
   ) => {
     setIsGenerating(true);
@@ -35,25 +34,11 @@ export const useResumeGeneration = () => {
       // Get original resume content from localStorage
       const originalResume = localStorage.getItem('originalResumeContent') || '';
       
-      // Sanitize contact info - remove empty strings
-      const sanitizeContactInfo = (info?: ContactInfo) => {
-        if (!info) return undefined;
-        const cleaned: Partial<ContactInfo> = {};
-        if (info.name?.trim()) cleaned.name = info.name.trim();
-        if (info.phone?.trim()) cleaned.phone = info.phone.trim();
-        if (info.email?.trim()) cleaned.email = info.email.trim();
-        if (info.linkedin?.trim()) cleaned.linkedin = info.linkedin.trim();
-        return Object.keys(cleaned).length > 0 ? cleaned : undefined;
-      };
-      
-      const cleanedContactInfo = sanitizeContactInfo(contactInfo);
-      
       const { data, error } = await supabase.functions.invoke('generate-content', {
         body: {
           job_description: jobDescription,
           original_resume: originalResume,
           template: template,
-          contact_info: cleanedContactInfo,
           include_cover_letter: includeCoverLetter
         }
       });
