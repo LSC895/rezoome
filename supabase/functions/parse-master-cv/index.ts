@@ -20,9 +20,9 @@ serve(async (req) => {
 
     console.log('Parsing resume with filename:', filename);
 
-    const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
-    if (!geminiApiKey) {
-      throw new Error('GEMINI_API_KEY not configured');
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    if (!LOVABLE_API_KEY) {
+      throw new Error('LOVABLE_API_KEY not configured');
     }
 
     const extractionPrompt = `You are an expert resume parser. Extract ALL information from this resume into structured JSON.
@@ -106,36 +106,40 @@ ${resumeText}
 
 OUTPUT ONLY VALID JSON, NO MARKDOWN OR EXPLANATIONS:`;
 
-    console.log('Calling Gemini API for parsing...');
+    console.log('Calling Lovable AI Gateway for parsing...');
 
-    const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{ text: extractionPrompt }]
-          }],
-          generationConfig: {
-            temperature: 0.1,
-            maxOutputTokens: 4096,
-          }
-        })
+    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash',
+        messages: [
+          { role: 'system', content: 'You are an expert resume parser. Output ONLY strict JSON per the required schema.' },
+          { role: 'user', content: extractionPrompt }
+        ]
+      })
+    });
+
+    if (!aiResponse.ok) {
+      const errorText = await aiResponse.text();
+      console.error('AI gateway error:', aiResponse.status, errorText);
+      if (aiResponse.status === 429) {
+        throw new Error('Rate limits exceeded, please try again later.');
       }
-    );
-
-    if (!geminiResponse.ok) {
-      const errorText = await geminiResponse.text();
-      console.error('Gemini API error:', errorText);
-      throw new Error(`Gemini API error: ${geminiResponse.status}`);
+      if (aiResponse.status === 402) {
+        throw new Error('Payment required, please add funds to your Lovable AI workspace.');
+      }
+      throw new Error(`AI gateway error: ${aiResponse.status}`);
     }
 
-    const geminiData = await geminiResponse.json();
-    const generatedText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
+    const aiData = await aiResponse.json();
+    const generatedText = aiData.choices?.[0]?.message?.content;
 
     if (!generatedText) {
-      console.error('No generated text from Gemini');
+      console.error('No generated text from AI gateway');
       throw new Error('Failed to parse resume - no response from AI');
     }
 
