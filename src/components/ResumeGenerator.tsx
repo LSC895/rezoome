@@ -9,6 +9,8 @@ import ChromeExtensionPromo from './ChromeExtensionPromo';
 import LoadingSkeleton from './LoadingSkeleton';
 import TemplateSelector from './TemplateSelector';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import jsPDF from 'jspdf';
 
 interface ResumeGeneratorProps {
   onBack: () => void;
@@ -24,8 +26,11 @@ const ResumeGenerator: React.FC<ResumeGeneratorProps> = ({ onBack, uploadedFile 
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [loadingStatus, setLoadingStatus] = useState('');
   const [isEditingResume, setIsEditingResume] = useState(false);
+  const [lastCallTime, setLastCallTime] = useState(0);
   
   const { generateResume, isGenerating, generatedResume } = useResumeGeneration();
+  
+  const MIN_CALL_INTERVAL = 3000; // 3 seconds between calls
 
   // Store the uploaded file content for generation
   useEffect(() => {
@@ -146,6 +151,15 @@ SKILLS
   const handleGenerateResume = async () => {
     if (!jobDescription.trim()) return;
     
+    // Client-side rate limiting
+    const now = Date.now();
+    if (now - lastCallTime < MIN_CALL_INTERVAL) {
+      toast.error('Please wait a few seconds before generating again');
+      return;
+    }
+    
+    setLastCallTime(now);
+    
     try {
       await generateResume(jobDescription, selectedTemplate, includeCoverLetter);
     } catch (error) {
@@ -167,37 +181,53 @@ SKILLS
   };
 
   const handleDownloadPDF = () => {
-    const element = document.createElement('a');
-    const file = new Blob([editedResumeContent], { type: 'text/plain' });
-    element.href = URL.createObjectURL(file);
-    element.download = `tailored-resume-${selectedTemplate}-${new Date().toISOString().split('T')[0]}.txt`;
-    document.body.appendChild(element);
-    element.click();
-    document.body.removeChild(element);
-    URL.revokeObjectURL(element.href);
+    try {
+      const doc = new jsPDF();
+      
+      // Split text into lines (jsPDF max width ~180mm)
+      const lines = doc.splitTextToSize(editedResumeContent || generatedResume?.content || '', 180);
+      
+      // Add text to PDF
+      doc.text(lines, 15, 15);
+      
+      // Download
+      const filename = `tailored-resume-${selectedTemplate}-${new Date().toISOString().split('T')[0]}.pdf`;
+      doc.save(filename);
+      toast.success('PDF downloaded!');
+    } catch (error) {
+      console.error('PDF generation error:', error);
+      toast.error('Failed to generate PDF');
+    }
   };
 
   const handleDownloadDOCX = () => {
-    const element = document.createElement('a');
-    const file = new Blob([editedResumeContent], { type: 'text/plain' });
-    element.href = URL.createObjectURL(file);
-    element.download = `tailored-resume-${selectedTemplate}-${new Date().toISOString().split('T')[0]}.txt`;
-    document.body.appendChild(element);
-    element.click();
-    document.body.removeChild(element);
-    URL.revokeObjectURL(element.href);
+    // For MVP, download as .txt with proper formatting
+    // Real DOCX generation needs docx library (add later if needed)
+    const blob = new Blob([editedResumeContent || generatedResume?.content || ''], 
+      { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `tailored-resume-${selectedTemplate}-${new Date().toISOString().split('T')[0]}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success('Resume downloaded!');
   };
 
   const handleDownloadCoverLetter = () => {
     if (!generatedCoverLetter) return;
-    const element = document.createElement('a');
-    const file = new Blob([generatedCoverLetter], { type: 'text/plain' });
-    element.href = URL.createObjectURL(file);
-    element.download = `cover-letter-${new Date().toISOString().split('T')[0]}.txt`;
-    document.body.appendChild(element);
-    element.click();
-    document.body.removeChild(element);
-    URL.revokeObjectURL(element.href);
+    const blob = new Blob([generatedCoverLetter], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `cover-letter-${new Date().toISOString().split('T')[0]}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success('Cover letter downloaded!');
   };
 
   return (
