@@ -6,6 +6,45 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Retry logic for Gemini API with exponential backoff
+async function callGeminiWithRetry(url: string, body: any, maxRetries = 2) {
+  for (let i = 0; i <= maxRetries; i++) {
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      
+      // Success
+      if (response.ok) return response;
+      
+      // Rate limit - wait and retry
+      if (response.status === 429 && i < maxRetries) {
+        const waitTime = 1000 * (2 ** i); // 1s, 2s
+        console.log(`Rate limited (429), retrying in ${waitTime}ms... (attempt ${i + 1}/${maxRetries})`);
+        await new Promise(r => setTimeout(r, waitTime));
+        continue;
+      }
+      
+      // Server error - retry once
+      if (response.status >= 500 && i < maxRetries) {
+        console.log(`Server error ${response.status}, retrying... (attempt ${i + 1}/${maxRetries})`);
+        await new Promise(r => setTimeout(r, 1000));
+        continue;
+      }
+      
+      // Other errors - don't retry
+      return response;
+    } catch (error) {
+      if (i === maxRetries) throw error;
+      console.log(`Network error, retrying... (attempt ${i + 1}/${maxRetries}):`, error);
+      await new Promise(r => setTimeout(r, 1000));
+    }
+  }
+  throw new Error('Max retries exceeded');
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -110,26 +149,25 @@ Generate the perfect resume for this job. Output ONLY the resume text:`;
 
     console.log('Calling Gemini API...')
 
-    const geminiResponse = await fetch(
+    const geminiResponse = await callGeminiWithRetry(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
       {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{ text: systemPrompt }]
-          }],
-          generationConfig: {
-            temperature: 0.3,
-            maxOutputTokens: 4096,
-          }
-        })
+        contents: [{
+          parts: [{ text: systemPrompt }]
+        }],
+        generationConfig: {
+          temperature: 0.3,
+          maxOutputTokens: 4096,
+        }
       }
     );
 
     if (!geminiResponse.ok) {
       const errorText = await geminiResponse.text();
-      console.error('Gemini API error:', errorText);
+      console.error('Gemini API error:', geminiResponse.status, errorText);
+      if (geminiResponse.status === 429) {
+        throw new Error('Rate limits exceeded, please try again later.');
+      }
       throw new Error(`Gemini API error: ${geminiResponse.status}`);
     }
 
@@ -171,20 +209,16 @@ Write a compelling cover letter that:
 
 Output ONLY the cover letter text:`;
 
-      const coverLetterResponse = await fetch(
+      const coverLetterResponse = await callGeminiWithRetry(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
         {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{
-              parts: [{ text: coverLetterPrompt }]
-            }],
-            generationConfig: {
-              temperature: 0.4,
-              maxOutputTokens: 2048,
-            }
-          })
+          contents: [{
+            parts: [{ text: coverLetterPrompt }]
+          }],
+          generationConfig: {
+            temperature: 0.4,
+            maxOutputTokens: 2048,
+          }
         }
       );
 
@@ -192,6 +226,8 @@ Output ONLY the cover letter text:`;
         const coverLetterData = await coverLetterResponse.json();
         coverLetter = coverLetterData.candidates?.[0]?.content?.parts?.[0]?.text;
         console.log('Cover letter generated');
+      } else {
+        console.error('Cover letter generation failed:', coverLetterResponse.status);
       }
     }
 

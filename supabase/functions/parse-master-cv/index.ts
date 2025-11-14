@@ -6,6 +6,45 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Retry logic for Gemini API with exponential backoff
+async function callGeminiWithRetry(url: string, body: any, maxRetries = 2) {
+  for (let i = 0; i <= maxRetries; i++) {
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      
+      // Success
+      if (response.ok) return response;
+      
+      // Rate limit - wait and retry
+      if (response.status === 429 && i < maxRetries) {
+        const waitTime = 1000 * (2 ** i); // 1s, 2s
+        console.log(`Rate limited (429), retrying in ${waitTime}ms... (attempt ${i + 1}/${maxRetries})`);
+        await new Promise(r => setTimeout(r, waitTime));
+        continue;
+      }
+      
+      // Server error - retry once
+      if (response.status >= 500 && i < maxRetries) {
+        console.log(`Server error ${response.status}, retrying... (attempt ${i + 1}/${maxRetries})`);
+        await new Promise(r => setTimeout(r, 1000));
+        continue;
+      }
+      
+      // Other errors - don't retry
+      return response;
+    } catch (error) {
+      if (i === maxRetries) throw error;
+      console.log(`Network error, retrying... (attempt ${i + 1}/${maxRetries}):`, error);
+      await new Promise(r => setTimeout(r, 1000));
+    }
+  }
+  throw new Error('Max retries exceeded');
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -20,9 +59,9 @@ serve(async (req) => {
 
     console.log('Parsing resume with filename:', filename);
 
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY not configured');
+    const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
+    if (!geminiApiKey) {
+      throw new Error('GEMINI_API_KEY not configured');
     }
 
     const extractionPrompt = `You are an expert resume parser. Extract ALL information from this resume into structured JSON.
@@ -34,6 +73,25 @@ CRITICAL RULES:
 - Extract quantifiable achievements with numbers where present
 - Preserve all technical skills, tools, and technologies mentioned
 - Extract complete job descriptions and responsibilities
+
+ADDITIONAL PARSING RULES:
+- If you see a date range like "Jan 2020 - Dec 2022", split it into start_date: "January 2020" and end_date: "December 2022"
+- For phone numbers, keep the EXACT format from the resume (including country code like +1 if present)
+- For URLs (LinkedIn, GitHub, Portfolio), ensure they start with https:// or http:// - add https:// if missing
+- For skills, categorize them properly:
+  * languages: Programming languages (JavaScript, Python, Java, etc.)
+  * frameworks: Frameworks and libraries (React, Node.js, Django, etc.)
+  * tools: Development tools (Git, Docker, VS Code, etc.)
+  * cloud: Cloud platforms (AWS, Azure, GCP, etc.)
+- Extract ALL numbers, percentages, and dollar amounts from achievement descriptions (e.g., "increased revenue by 40%" or "managed $2M budget")
+- If you're unsure about a field, use null instead of guessing or using placeholder text
+
+QUALITY CHECKLIST (validate before returning):
+1. Contact info is complete (at least full_name and email must be present)
+2. All dates follow "Month YYYY" format (e.g., "January 2020" not "01/2020" or "2020-01")
+3. Each work experience has at least one achievement in the achievements array
+4. Skills are categorized into languages, frameworks, tools, cloud (not just a flat list)
+5. No placeholder text like "example.com", "Your Name", "john.doe@email.com", etc.
 
 REQUIRED OUTPUT FORMAT (valid JSON only):
 {
@@ -106,40 +164,35 @@ ${resumeText}
 
 OUTPUT ONLY VALID JSON, NO MARKDOWN OR EXPLANATIONS:`;
 
-    console.log('Calling Lovable AI Gateway for parsing...');
+    console.log('Calling Gemini API for parsing...');
 
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          { role: 'system', content: 'You are an expert resume parser. Output ONLY strict JSON per the required schema.' },
-          { role: 'user', content: extractionPrompt }
-        ]
-      })
-    });
+    const geminiResponse = await callGeminiWithRetry(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
+      {
+        contents: [{
+          parts: [{ text: extractionPrompt }]
+        }],
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: 4096,
+        }
+      }
+    );
 
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      console.error('AI gateway error:', aiResponse.status, errorText);
-      if (aiResponse.status === 429) {
+    if (!geminiResponse.ok) {
+      const errorText = await geminiResponse.text();
+      console.error('Gemini API error:', geminiResponse.status, errorText);
+      if (geminiResponse.status === 429) {
         throw new Error('Rate limits exceeded, please try again later.');
       }
-      if (aiResponse.status === 402) {
-        throw new Error('Payment required, please add funds to your Lovable AI workspace.');
-      }
-      throw new Error(`AI gateway error: ${aiResponse.status}`);
+      throw new Error(`Gemini API error: ${geminiResponse.status}`);
     }
 
-    const aiData = await aiResponse.json();
-    const generatedText = aiData.choices?.[0]?.message?.content;
+    const geminiData = await geminiResponse.json();
+    const generatedText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (!generatedText) {
-      console.error('No generated text from AI gateway');
+      console.error('No generated text from Gemini API');
       throw new Error('Failed to parse resume - no response from AI');
     }
 
