@@ -10,11 +10,20 @@ interface GenerationCount {
   count: number;
 }
 
+interface ATSAnalysis {
+  match_score: string;
+  matched_skills: string[];
+  missing_skills: string[];
+  missing_keywords: string[];
+  reasoning: string;
+}
+
 interface GeneratedResume {
   content: string;
   cover_letter?: string;
   ats_score: number;
   template: string;
+  ats_analysis?: ATSAnalysis;
 }
 
 export const useAnonymousGeneration = () => {
@@ -27,12 +36,16 @@ export const useAnonymousGeneration = () => {
     if (!stored) {
       return { date: new Date().toDateString(), count: 0 };
     }
-    const parsed = JSON.parse(stored);
-    // Reset if it's a new day
-    if (parsed.date !== new Date().toDateString()) {
+    try {
+      const parsed = JSON.parse(stored);
+      // Reset if it's a new day
+      if (parsed.date !== new Date().toDateString()) {
+        return { date: new Date().toDateString(), count: 0 };
+      }
+      return parsed;
+    } catch {
       return { date: new Date().toDateString(), count: 0 };
     }
-    return parsed;
   };
 
   const incrementDailyCount = () => {
@@ -72,14 +85,25 @@ export const useAnonymousGeneration = () => {
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Generation error:', error);
+        throw new Error(error.message || 'Failed to generate resume');
+      }
+
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      if (!data?.resume) {
+        throw new Error('No resume generated');
+      }
 
       incrementDailyCount();
       setGeneratedResume(data.resume);
 
       toast({
         title: includeCoverLetter ? "Resume & Cover Letter generated! ✨" : "Resume generated! ✨",
-        description: "Sign in to download your tailored resume.",
+        description: "Sign in to download your tailored resume as PDF.",
       });
 
       return data.resume;
@@ -90,8 +114,12 @@ export const useAnonymousGeneration = () => {
       
       if (error && typeof error === 'object' && 'message' in error) {
         const err = error as any;
-        if (err.message?.includes('Rate limit')) {
+        if (err.message?.includes('Rate limit') || err.message?.includes('429')) {
           errorMessage = "Too many requests. Please wait a moment and try again.";
+        } else if (err.message?.includes('GEMINI_API_KEY')) {
+          errorMessage = "AI service is temporarily unavailable. Please try again later.";
+        } else if (err.message) {
+          errorMessage = err.message;
         }
       }
       
