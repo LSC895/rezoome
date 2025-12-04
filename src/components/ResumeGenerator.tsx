@@ -4,11 +4,11 @@ import { Button } from '@/components/ui/button';
 import { useResumeGeneration } from '@/hooks/useResumeGeneration';
 import { useAnonymousGeneration } from '@/hooks/useAnonymousGeneration';
 import { FormattedResume } from './FormattedResume';
+import { ATSAnalysis } from './ATSAnalysis';
 import { AuthRequiredModal } from './AuthRequiredModal';
 import ChromeExtensionPromo from './ChromeExtensionPromo';
 import LoadingSkeleton from './LoadingSkeleton';
 import TemplateSelector from './TemplateSelector';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 import { useUser } from '@clerk/clerk-react';
@@ -32,6 +32,7 @@ const ResumeGenerator: React.FC<ResumeGeneratorProps> = ({ onBack, uploadedFile,
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalAction, setAuthModalAction] = useState<'download' | 'copy' | 'generate_limit'>('download');
   const [copied, setCopied] = useState(false);
+  const [atsAnalysis, setAtsAnalysis] = useState<any>(null);
   
   const { user } = useUser();
   const isAuthenticated = !!user;
@@ -58,10 +59,13 @@ const ResumeGenerator: React.FC<ResumeGeneratorProps> = ({ onBack, uploadedFile,
       if (generatedResume.cover_letter) {
         setGeneratedCoverLetter(generatedResume.cover_letter);
       }
+      if ((generatedResume as any).ats_analysis) {
+        setAtsAnalysis((generatedResume as any).ats_analysis);
+      }
     }
   }, [generatedResume]);
 
-  // Loading progress simulation
+  // Loading progress simulation - faster for better UX
   useEffect(() => {
     if (isGenerating) {
       setLoadingProgress(0);
@@ -69,29 +73,32 @@ const ResumeGenerator: React.FC<ResumeGeneratorProps> = ({ onBack, uploadedFile,
       
       const interval = setInterval(() => {
         setLoadingProgress(prev => {
-          if (prev < 30) {
+          if (prev < 25) {
             setLoadingStatus('Extracting key requirements...');
+            return prev + 3;
+          } else if (prev < 50) {
+            setLoadingStatus('Matching skills to job description...');
             return prev + 2;
-          } else if (prev < 60) {
-            setLoadingStatus('Tailoring your resume with AI...');
-            return prev + 1;
-          } else if (prev < 85) {
-            setLoadingStatus('Optimizing for ATS compatibility...');
-            return prev + 0.5;
-          } else if (prev < 95) {
+          } else if (prev < 75) {
+            setLoadingStatus('Generating ATS-optimized resume...');
+            return prev + 1.5;
+          } else if (prev < 90) {
             setLoadingStatus('Adding action-driven bullet points...');
-            return prev + 0.2;
+            return prev + 0.5;
           }
           return prev;
         });
-      }, 500);
+      }, 300);
 
       return () => clearInterval(interval);
     }
   }, [isGenerating]);
 
   const handleGenerateResume = async () => {
-    if (!jobDescription.trim()) return;
+    if (!jobDescription.trim()) {
+      toast.error('Please paste a job description first');
+      return;
+    }
     
     // Client-side rate limiting
     const now = Date.now();
@@ -108,6 +115,7 @@ const ResumeGenerator: React.FC<ResumeGeneratorProps> = ({ onBack, uploadedFile,
     }
     
     setLastCallTime(now);
+    setAtsAnalysis(null);
     
     try {
       if (isAuthenticated) {
@@ -118,12 +126,14 @@ const ResumeGenerator: React.FC<ResumeGeneratorProps> = ({ onBack, uploadedFile,
       }
     } catch (error) {
       console.error('Failed to generate resume:', error);
+      toast.error('Failed to generate resume. Please try again.');
     }
   };
 
   const handleSaveResume = (content: string) => {
     setEditedResumeContent(content);
     setIsEditingResume(false);
+    toast.success('Resume saved!');
   };
 
   const handleCancelEdit = () => {
@@ -134,6 +144,7 @@ const ResumeGenerator: React.FC<ResumeGeneratorProps> = ({ onBack, uploadedFile,
     setIsEditingResume(!isEditingResume);
   };
 
+  // Improved PDF generation with better formatting
   const handleDownloadPDF = () => {
     if (!isAuthenticated) {
       setAuthModalAction('download');
@@ -142,15 +153,108 @@ const ResumeGenerator: React.FC<ResumeGeneratorProps> = ({ onBack, uploadedFile,
     }
     
     try {
-      const doc = new jsPDF();
-      const lines = doc.splitTextToSize(editedResumeContent || generatedResume?.content || '', 180);
-      doc.text(lines, 15, 15);
-      const filename = `tailored-resume-${selectedTemplate}-${new Date().toISOString().split('T')[0]}.pdf`;
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+      
+      const content = editedResumeContent || generatedResume?.content || '';
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 15;
+      const maxWidth = pageWidth - (margin * 2);
+      
+      // Set default font
+      doc.setFont('helvetica');
+      
+      let y = margin;
+      const lineHeight = 5;
+      
+      const lines = content.split('\n');
+      
+      for (const line of lines) {
+        const trimmedLine = line.trim();
+        
+        // Check if we need a new page
+        if (y > pageHeight - margin) {
+          doc.addPage();
+          y = margin;
+        }
+        
+        // Section headers (ALL CAPS)
+        if (/^[A-Z\s]{3,}$/.test(trimmedLine) && trimmedLine.length > 3) {
+          y += 3; // Add space before header
+          doc.setFontSize(12);
+          doc.setFont('helvetica', 'bold');
+          doc.text(trimmedLine, margin, y);
+          y += lineHeight + 2;
+          
+          // Draw underline
+          doc.setDrawColor(100, 100, 100);
+          doc.line(margin, y - 3, pageWidth - margin, y - 3);
+          continue;
+        }
+        
+        // Name (first line, usually largest)
+        if (y === margin && trimmedLine && !trimmedLine.startsWith('•')) {
+          doc.setFontSize(16);
+          doc.setFont('helvetica', 'bold');
+          doc.text(trimmedLine, margin, y);
+          y += lineHeight + 4;
+          continue;
+        }
+        
+        // Contact info line (contains | separator)
+        if (trimmedLine.includes(' | ') && y < margin + 20) {
+          doc.setFontSize(9);
+          doc.setFont('helvetica', 'normal');
+          doc.text(trimmedLine, margin, y);
+          y += lineHeight;
+          continue;
+        }
+        
+        // Bullet points
+        if (trimmedLine.startsWith('•') || trimmedLine.startsWith('-') || trimmedLine.startsWith('*')) {
+          doc.setFontSize(10);
+          doc.setFont('helvetica', 'normal');
+          const bulletText = trimmedLine.substring(1).trim();
+          const splitText = doc.splitTextToSize(`• ${bulletText}`, maxWidth - 5);
+          doc.text(splitText, margin + 3, y);
+          y += splitText.length * lineHeight;
+          continue;
+        }
+        
+        // Job titles or company names (contains — or |)
+        if ((trimmedLine.includes(' — ') || trimmedLine.includes(' | ')) && !trimmedLine.startsWith('•')) {
+          doc.setFontSize(11);
+          doc.setFont('helvetica', 'bold');
+          const splitText = doc.splitTextToSize(trimmedLine, maxWidth);
+          doc.text(splitText, margin, y);
+          y += splitText.length * lineHeight + 1;
+          continue;
+        }
+        
+        // Empty lines
+        if (!trimmedLine) {
+          y += 2;
+          continue;
+        }
+        
+        // Regular text
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        const splitText = doc.splitTextToSize(trimmedLine, maxWidth);
+        doc.text(splitText, margin, y);
+        y += splitText.length * lineHeight;
+      }
+      
+      const filename = `tailored-resume-${new Date().toISOString().split('T')[0]}.pdf`;
       doc.save(filename);
-      toast.success('PDF downloaded!');
+      toast.success('PDF downloaded successfully!');
     } catch (error) {
       console.error('PDF generation error:', error);
-      toast.error('Failed to generate PDF');
+      toast.error('Failed to generate PDF. Please try again.');
     }
   };
 
@@ -161,12 +265,12 @@ const ResumeGenerator: React.FC<ResumeGeneratorProps> = ({ onBack, uploadedFile,
       return;
     }
     
-    const blob = new Blob([editedResumeContent || generatedResume?.content || ''], 
-      { type: 'text/plain' });
+    const content = editedResumeContent || generatedResume?.content || '';
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `tailored-resume-${selectedTemplate}-${new Date().toISOString().split('T')[0]}.txt`;
+    a.download = `tailored-resume-${new Date().toISOString().split('T')[0]}.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -195,7 +299,7 @@ const ResumeGenerator: React.FC<ResumeGeneratorProps> = ({ onBack, uploadedFile,
     }
     
     if (!generatedCoverLetter) return;
-    const blob = new Blob([generatedCoverLetter], { type: 'text/plain' });
+    const blob = new Blob([generatedCoverLetter], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -229,10 +333,10 @@ const ResumeGenerator: React.FC<ResumeGeneratorProps> = ({ onBack, uploadedFile,
         </Button>
         
         {!isAuthenticated && (
-          <div className="text-sm text-muted-foreground">
+          <div className="text-sm text-muted-foreground bg-muted/50 px-3 py-1.5 rounded-full">
             {getRemainingGenerations() > 0 
               ? `${getRemainingGenerations()} free generation left today`
-              : 'Daily limit reached - Sign in for more'
+              : '🔒 Daily limit reached - Sign in for more'
             }
           </div>
         )}
@@ -243,7 +347,7 @@ const ResumeGenerator: React.FC<ResumeGeneratorProps> = ({ onBack, uploadedFile,
           Generate Job-Specific Resume
         </h1>
         <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-          Paste any job description and get an ATS-optimized resume tailored for that role
+          Paste any job description and get an ATS-optimized resume in seconds
         </p>
         <div className="inline-flex items-center space-x-2 bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400 px-4 py-2 rounded-full text-sm">
           <span className="font-medium">✓ Resume uploaded: {uploadedFile.name}</span>
@@ -266,7 +370,7 @@ const ResumeGenerator: React.FC<ResumeGeneratorProps> = ({ onBack, uploadedFile,
               Job Description
             </label>
             <p className="text-muted-foreground">
-              Copy and paste the complete job posting, including requirements, responsibilities, and qualifications.
+              Copy and paste the complete job posting, including requirements and qualifications.
             </p>
           </div>
 
@@ -288,7 +392,7 @@ We are looking for a Senior Software Engineer with 3+ years of experience in Rea
               id="includeCoverLetter"
               checked={includeCoverLetter}
               onChange={(e) => setIncludeCoverLetter(e.target.checked)}
-              className="rounded border-border"
+              className="rounded border-border h-5 w-5"
             />
             <div>
               <label htmlFor="includeCoverLetter" className="font-medium text-foreground cursor-pointer flex items-center">
@@ -306,16 +410,16 @@ We are looking for a Senior Software Engineer with 3+ years of experience in Rea
               onClick={handleGenerateResume}
               disabled={isGenerating || !jobDescription.trim()}
               size="lg"
-              className="gradient-purple text-white font-sora font-bold text-xl py-4 px-8 rounded-2xl hover:opacity-90 transition-opacity"
+              className="gradient-purple text-white font-sora font-bold text-xl py-6 px-10 rounded-2xl hover:opacity-90 transition-opacity"
             >
               {isGenerating ? (
                 <>
-                  <Wand2 className="animate-spin mr-2 h-5 w-5" />
+                  <Wand2 className="animate-spin mr-2 h-6 w-6" />
                   GENERATING...
                 </>
               ) : (
                 <>
-                  <Wand2 className="mr-2 h-5 w-5" />
+                  <Wand2 className="mr-2 h-6 w-6" />
                   GENERATE {includeCoverLetter ? 'RESUME & COVER LETTER' : 'TAILORED RESUME'}
                 </>
               )}
@@ -332,21 +436,15 @@ We are looking for a Senior Software Engineer with 3+ years of experience in Rea
       {/* Generated Resume Preview */}
       {generatedResume && !isGenerating && (
         <div className="space-y-6">
-          {/* ATS Score Display */}
+          {/* ATS Analysis Section */}
           <div className="max-w-4xl mx-auto">
-            <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border border-green-200 dark:border-green-800 rounded-2xl p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-bold text-lg text-green-800 dark:text-green-200">ATS Compatibility Score</h3>
-                  <p className="text-sm text-green-700 dark:text-green-300">Your resume is optimized for applicant tracking systems</p>
-                </div>
-                <div className="text-4xl font-bold text-green-600 dark:text-green-400">
-                  {generatedResume.ats_score}%
-                </div>
-              </div>
-            </div>
+            <ATSAnalysis 
+              atsScore={generatedResume.ats_score} 
+              atsAnalysis={atsAnalysis}
+            />
           </div>
 
+          {/* Resume Preview */}
           <div className="max-w-5xl mx-auto animate-scale-in">
             <FormattedResume
               content={editedResumeContent}
@@ -364,11 +462,11 @@ We are looking for a Senior Software Engineer with 3+ years of experience in Rea
             {!isEditingResume && (
               <div className="text-center space-y-4 mt-6">
                 <p className="text-muted-foreground">
-                  This resume has been ATS-optimized with keywords from the job description and tailored to match the specific requirements.
+                  This resume has been ATS-optimized with keywords from the job description.
                 </p>
                 {!isAuthenticated && (
-                  <p className="text-sm text-purple-600 font-medium">
-                    ✨ Sign in free to download your optimized resume
+                  <p className="text-sm text-purple-600 dark:text-purple-400 font-medium">
+                    ✨ Sign in free to download your optimized resume as PDF
                   </p>
                 )}
               </div>

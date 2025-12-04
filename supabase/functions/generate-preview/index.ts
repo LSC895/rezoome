@@ -6,7 +6,7 @@ const corsHeaders = {
 };
 
 // Retry logic for Gemini API with exponential backoff
-async function callGeminiWithRetry(url: string, body: any, maxRetries = 2) {
+async function callGeminiWithRetry(url: string, body: any, maxRetries = 3) {
   for (let i = 0; i <= maxRetries; i++) {
     try {
       const response = await fetch(url, {
@@ -40,6 +40,36 @@ async function callGeminiWithRetry(url: string, body: any, maxRetries = 2) {
   throw new Error('Max retries exceeded');
 }
 
+// Extract keywords from job description
+function extractKeywords(text: string): string[] {
+  const commonWords = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'as', 'is', 'was', 'are', 'were', 'been', 'be', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'must', 'can', 'this', 'that', 'these', 'those', 'it', 'its', 'they', 'them', 'their', 'we', 'our', 'you', 'your', 'i', 'me', 'my', 'he', 'she', 'him', 'her', 'who', 'which', 'what', 'when', 'where', 'why', 'how', 'all', 'each', 'every', 'both', 'few', 'more', 'most', 'other', 'some', 'such', 'no', 'not', 'only', 'same', 'so', 'than', 'too', 'very', 'just', 'also', 'now', 'here', 'there', 'about', 'after', 'before', 'between', 'into', 'through', 'during', 'above', 'below', 'up', 'down', 'out', 'off', 'over', 'under', 'again', 'further', 'then', 'once', 'any', 'well', 'work', 'working', 'experience', 'years', 'year', 'team', 'ability', 'strong', 'looking', 'seeking', 'role', 'position', 'including', 'etc', 'including']);
+  
+  const words = text.toLowerCase()
+    .replace(/[^a-z0-9\s\-\/\+\#\.]/g, ' ')
+    .split(/\s+/)
+    .filter(word => word.length > 2 && !commonWords.has(word));
+  
+  // Also extract multi-word phrases
+  const phrases: string[] = [];
+  const phrasePatterns = [
+    /\b(machine learning|deep learning|data science|data engineering|software engineer|full stack|front end|back end|devops|cloud computing|project management|product management|business analysis|data analysis|web development|mobile development|api development|database management|system design|agile methodology|scrum master|ci\/cd|version control|unit testing|integration testing)\b/gi,
+    /\b(react\.?js?|node\.?js?|vue\.?js?|angular\.?js?|next\.?js?|express\.?js?|spring boot|ruby on rails|django|flask|asp\.net|\.net core)\b/gi,
+    /\b(aws|azure|gcp|google cloud|amazon web services|microsoft azure)\b/gi,
+    /\b(python|javascript|typescript|java|c\+\+|c#|ruby|go|rust|kotlin|swift|php|scala)\b/gi,
+    /\b(sql|nosql|mongodb|postgresql|mysql|redis|elasticsearch|dynamodb|cassandra)\b/gi,
+    /\b(docker|kubernetes|terraform|jenkins|github actions|gitlab ci|ansible|puppet|chef)\b/gi,
+  ];
+  
+  phrasePatterns.forEach(pattern => {
+    const matches = text.match(pattern);
+    if (matches) {
+      phrases.push(...matches.map(m => m.toLowerCase()));
+    }
+  });
+  
+  return [...new Set([...words, ...phrases])];
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -58,6 +88,10 @@ serve(async (req) => {
     if (!geminiApiKey) {
       throw new Error('GEMINI_API_KEY not configured');
     }
+
+    // Extract JD keywords for analysis
+    const jdKeywords = extractKeywords(job_description);
+    console.log('Extracted JD keywords:', jdKeywords.length);
 
     // Build structured context from master CV data
     const structuredContext = {
@@ -79,67 +113,85 @@ serve(async (req) => {
       achievements: master_cv_data.achievements
     };
 
-    // IMPROVED ATS-OPTIMIZED PROMPT
-    const systemPrompt = `You are an expert ATS resume writer who creates job-winning, recruiter-ready resumes.
+    // STRICT ATS-OPTIMIZED RESUME PROMPT
+    const systemPrompt = `You are an expert ATS resume writer specializing in resumes for FRESHERS and ACTIVE JOB SEEKERS.
 
-INPUT: Structured master CV data (JSON) and a target job description.
-OUTPUT: A perfectly tailored, ATS-optimized resume in clean text format.
+Your job: Create a job-tailored, ATS-optimized, ready-to-upload resume.
 
-=== CRITICAL RESUME WRITING RULES ===
+=== STRICT OUTPUT FORMAT (DO NOT DEVIATE) ===
 
-1. FORMAT & STRUCTURE:
-   - Use ATS-safe formatting: NO tables, NO icons, NO graphics, NO columns
-   - Clean text-only layout with clear section headers
-   - Standard sections in this order: CONTACT INFO → PROFESSIONAL SUMMARY → KEY SKILLS → WORK EXPERIENCE → PROJECTS → EDUCATION
-   - Use consistent formatting throughout
+${master_cv_data.full_name || 'CANDIDATE NAME'}
+${master_cv_data.email || ''} | ${master_cv_data.phone || ''} | ${master_cv_data.location || ''}
+${master_cv_data.linkedin_url ? master_cv_data.linkedin_url : ''}
 
-2. PROFESSIONAL SUMMARY (3-4 lines):
-   - Lead with years of experience + primary expertise
-   - Include 2-3 job-specific keywords naturally
-   - End with a measurable achievement or value proposition
+SUMMARY
+• 2-3 lines describing strengths, domain knowledge, and career intent aligned with this job.
 
-3. KEY SKILLS SECTION:
-   - List 10-15 skills that directly match the job requirements
-   - Group by category (Technical, Tools, Soft Skills)
-   - Prioritize skills mentioned in the job description
+KEY SKILLS
+• Skill A | Skill B | Skill C | Skill D | Skill E | Skill F
+(List 8-12 skills that DIRECTLY match the job requirements, separated by | )
 
-4. WORK EXPERIENCE (Action → Impact → Result):
-   - Start every bullet with a STRONG ACTION VERB (Led, Engineered, Optimized, Delivered, Architected, Transformed, etc.)
-   - QUANTIFY results wherever possible: percentages, dollar amounts, time saved, users impacted
-   - Format: [Action Verb] + [What you did] + [Measurable Result/Impact]
+EXPERIENCE
+[Job Title] — [Company Name] | [Start Date] - [End Date]
+• Action verb → task → measurable result
+• Action verb → responsibility → quantified improvement
+• Action verb → tool used → specific outcome
+• JD keywords inserted naturally
+
+(Repeat for each relevant position, max 3-4 positions)
+
+PROJECTS
+[Project Name]
+• One-line explanation of what it does
+• Technologies/Tools used: [list]
+• Result/Impact: [measurable outcome if available]
+
+(Include 2-3 projects, REQUIRED for freshers)
+
+EDUCATION
+[Degree Name], [Institution Name], [Year]
+• Relevant coursework or achievements if applicable
+
+CERTIFICATIONS (if any)
+• Certification Name - Issuing Organization
+
+=== CRITICAL RULES ===
+
+1. FORMAT:
+   - ATS-safe text ONLY: NO tables, NO icons, NO graphics, NO columns
+   - Single column layout
+   - Clear section headers in ALL CAPS
+   - One empty line between sections
+   - Consistent bullet points using •
+
+2. BULLET POINTS (Action → Impact → Result):
+   - Start EVERY bullet with STRONG action verb: Led, Engineered, Optimized, Delivered, Built, Developed, Implemented, Designed, Created, Launched
+   - QUANTIFY when possible: percentages, numbers, dollar amounts, time saved
    
-   EXAMPLES of strong bullets:
-   ✓ "Engineered automated testing framework that reduced QA time by 60% and caught 40% more bugs pre-release"
-   ✓ "Led cross-functional team of 8 engineers to deliver $2M platform migration 3 weeks ahead of schedule"
-   ✓ "Optimized database queries resulting in 45% faster page load times and 99.9% uptime"
+   GOOD EXAMPLES:
+   • Developed REST API handling 10,000+ daily requests with 99.9% uptime
+   • Reduced page load time by 40% through code optimization and caching
+   • Led team of 5 developers to deliver e-commerce platform 2 weeks ahead of schedule
    
-   AVOID weak bullets like:
-   ✗ "Responsible for testing"
-   ✗ "Worked on various projects"
-   ✗ "Helped with code reviews"
+   BAD EXAMPLES (NEVER USE):
+   • Responsible for coding
+   • Helped with projects
+   • Worked on various tasks
 
-5. KEYWORD OPTIMIZATION:
+3. KEYWORD OPTIMIZATION:
    - Extract 15-20 keywords from the job description
-   - Naturally integrate them throughout the resume
-   - Match exact phrases when possible (e.g., "CI/CD pipelines" not just "automation")
-   - Include both acronyms and full terms (AWS and Amazon Web Services)
+   - Naturally integrate them in Summary, Skills, and Experience
+   - Use exact phrases from JD when applicable
 
-6. TAILORING RULES:
-   - Select the 3-4 most relevant work experiences for this specific job
-   - Reorder bullet points to prioritize job-relevant achievements
-   - Adapt language to match the job description's tone
-   - Insert missing skills ONLY if they align with the candidate's actual experience
-   - Do NOT invent fake experience or achievements
+4. TAILORING:
+   - Prioritize experiences most relevant to THIS job
+   - Reorder bullets to highlight job-relevant achievements first
+   - Do NOT invent fake experience or skills
+   - Only include skills the candidate actually has
 
-7. LENGTH:
-   - 1 page for <10 years experience
-   - 2 pages max for 10+ years
-
-TEMPLATE STYLE: ${template}
-${template === 'modern' ? '- Clean, minimal with clear visual hierarchy' : ''}
-${template === 'professional' ? '- Traditional format emphasizing career progression' : ''}
-${template === 'creative' ? '- Slightly more expressive language while maintaining professionalism' : ''}
-${template === 'technical' ? '- Technical projects and skills prominently featured' : ''}
+5. LENGTH:
+   - 1 page for freshers or <5 years experience
+   - Keep it concise and impactful
 
 === JOB DESCRIPTION ===
 ${job_description}
@@ -147,9 +199,10 @@ ${job_description}
 === CANDIDATE DATA ===
 ${JSON.stringify(structuredContext, null, 2)}
 
-Generate a polished, ATS-optimized, recruiter-ready resume. Output ONLY the resume text (no markdown, no code blocks, no JSON):`;
+Generate the resume NOW. Output ONLY the resume text following the exact format above:`;
 
-    console.log('Calling Gemini API...');
+    console.log('Calling Gemini API for resume...');
+    const startTime = Date.now();
 
     const geminiResponse = await callGeminiWithRetry(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${geminiApiKey}`,
@@ -158,8 +211,8 @@ Generate a polished, ATS-optimized, recruiter-ready resume. Output ONLY the resu
           parts: [{ text: systemPrompt }]
         }],
         generationConfig: {
-          temperature: 0.3,
-          maxOutputTokens: 4096,
+          temperature: 0.2,
+          maxOutputTokens: 3000,
         }
       }
     );
@@ -168,45 +221,50 @@ Generate a polished, ATS-optimized, recruiter-ready resume. Output ONLY the resu
       const errorText = await geminiResponse.text();
       console.error('Gemini API error:', geminiResponse.status, errorText);
       if (geminiResponse.status === 429) {
-        throw new Error('Rate limits exceeded, please try again later.');
+        throw new Error('Rate limits exceeded, please try again in a few seconds.');
       }
-      throw new Error(`Gemini API error: ${geminiResponse.status}`);
+      throw new Error(`AI service temporarily unavailable. Please try again.`);
     }
 
     const geminiData = await geminiResponse.json();
     const generatedResume = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (!generatedResume) {
-      throw new Error('Failed to generate resume');
+      throw new Error('Failed to generate resume. Please try again.');
     }
 
-    console.log('Resume generated, length:', generatedResume.length);
+    const resumeGenTime = Date.now() - startTime;
+    console.log(`Resume generated in ${resumeGenTime}ms, length: ${generatedResume.length}`);
 
     // Generate cover letter if requested
     let coverLetter = null;
     if (include_cover_letter) {
       console.log('Generating cover letter...');
       
-      const coverLetterPrompt = `Generate a compelling, professional cover letter for this job application.
+      const coverLetterPrompt = `Generate a professional, compelling cover letter for this job application.
+
+CANDIDATE: ${master_cv_data.full_name}
+EMAIL: ${master_cv_data.email}
+PHONE: ${master_cv_data.phone}
 
 JOB DESCRIPTION:
 ${job_description}
 
-CANDIDATE DATA:
-Name: ${master_cv_data.full_name}
-Contact: ${master_cv_data.email} | ${master_cv_data.phone}
+CANDIDATE BACKGROUND:
 Summary: ${master_cv_data.professional_summary}
-Recent Experience: ${JSON.stringify(master_cv_data.work_experience?.slice(0, 2) || [])}
 Key Skills: ${JSON.stringify(master_cv_data.technical_skills)}
+Recent Experience: ${JSON.stringify(master_cv_data.work_experience?.slice(0, 2) || [])}
 
-COVER LETTER REQUIREMENTS:
-1. Use the EXACT contact information provided above
-2. Address specific requirements from the job description
-3. Highlight 2-3 most relevant achievements with quantified results
-4. Show genuine enthusiasm for the role and company
-5. 3-4 paragraphs: Opening hook → Body with qualifications → Strong closing with call to action
+=== COVER LETTER REQUIREMENTS ===
+1. Professional format with date
+2. 3-4 paragraphs:
+   - Opening: Hook with enthusiasm for the role + 1 key qualification
+   - Body (1-2 paragraphs): 2-3 specific achievements that match job requirements
+   - Closing: Call to action + availability
+3. Match keywords from job description
+4. Show genuine interest in the company/role
+5. Keep it under 400 words
 6. Professional but personable tone
-7. Include proper letter formatting with date
 
 Output ONLY the cover letter text:`;
 
@@ -218,7 +276,7 @@ Output ONLY the cover letter text:`;
           }],
           generationConfig: {
             temperature: 0.4,
-            maxOutputTokens: 2048,
+            maxOutputTokens: 1500,
           }
         }
       );
@@ -230,13 +288,69 @@ Output ONLY the cover letter text:`;
       }
     }
 
-    // Calculate a more meaningful ATS score based on keyword matching
-    const jobKeywords = job_description.toLowerCase().split(/\s+/);
-    const resumeText = generatedResume.toLowerCase();
-    const matchedKeywords = jobKeywords.filter((kw: string) => 
-      kw.length > 3 && resumeText.includes(kw)
-    ).length;
-    const atsScore = Math.min(98, Math.max(75, 70 + Math.floor(matchedKeywords / 3)));
+    // Calculate ATS analysis with matched/missing skills
+    const resumeTextLower = generatedResume.toLowerCase();
+    const cvSkills: string[] = [];
+    
+    // Extract skills from CV data
+    if (master_cv_data.technical_skills) {
+      if (Array.isArray(master_cv_data.technical_skills)) {
+        cvSkills.push(...master_cv_data.technical_skills.map((s: string) => s.toLowerCase()));
+      } else if (typeof master_cv_data.technical_skills === 'object') {
+        Object.values(master_cv_data.technical_skills).forEach((category: any) => {
+          if (Array.isArray(category)) {
+            cvSkills.push(...category.map((s: string) => s.toLowerCase()));
+          }
+        });
+      }
+    }
+
+    // Analyze keyword matching
+    const matchedSkills: string[] = [];
+    const missingSkills: string[] = [];
+    const matchedKeywords: string[] = [];
+    const missingKeywords: string[] = [];
+
+    jdKeywords.forEach(keyword => {
+      const isInResume = resumeTextLower.includes(keyword.toLowerCase());
+      const isSkill = keyword.length > 2 && /^[a-z\+\#\.\-\/]+$/i.test(keyword);
+      
+      if (isInResume) {
+        if (isSkill && keyword.length > 3) {
+          matchedSkills.push(keyword);
+        }
+        matchedKeywords.push(keyword);
+      } else {
+        if (isSkill && keyword.length > 3) {
+          missingSkills.push(keyword);
+        }
+        missingKeywords.push(keyword);
+      }
+    });
+
+    // Calculate match score
+    const totalRelevantKeywords = matchedKeywords.length + missingKeywords.length;
+    const matchPercentage = totalRelevantKeywords > 0 
+      ? Math.round((matchedKeywords.length / totalRelevantKeywords) * 100)
+      : 75;
+    
+    const atsScore = Math.min(98, Math.max(65, matchPercentage));
+
+    // Build ATS analysis response
+    const atsAnalysis = {
+      match_score: `${atsScore}%`,
+      matched_skills: [...new Set(matchedSkills)].slice(0, 15),
+      missing_skills: [...new Set(missingSkills)].slice(0, 10),
+      missing_keywords: [...new Set(missingKeywords)].slice(0, 8),
+      reasoning: atsScore >= 85 
+        ? "Excellent match! Your resume aligns well with the job requirements."
+        : atsScore >= 70 
+        ? "Good match. Consider adding missing skills if you have experience with them."
+        : "Moderate match. Focus on highlighting more relevant experience."
+    };
+
+    const totalTime = Date.now() - startTime;
+    console.log(`Total generation time: ${totalTime}ms`);
 
     return new Response(
       JSON.stringify({
@@ -245,6 +359,7 @@ Output ONLY the cover letter text:`;
           cover_letter: coverLetter,
           ats_score: atsScore,
           template: template,
+          ats_analysis: atsAnalysis
         }
       }),
       { 
@@ -257,7 +372,7 @@ Output ONLY the cover letter text:`;
     console.error('Error in generate-preview:', error);
     return new Response(
       JSON.stringify({ 
-        error: error instanceof Error ? error.message : 'Unknown error' 
+        error: error instanceof Error ? error.message : 'Failed to generate resume. Please try again.' 
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
