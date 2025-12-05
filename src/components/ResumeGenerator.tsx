@@ -258,7 +258,7 @@ const ResumeGenerator: React.FC<ResumeGeneratorProps> = ({ onBack, uploadedFile,
     }
   };
 
-  const handleDownloadDOCX = () => {
+  const handleDownloadTXT = () => {
     if (!isAuthenticated) {
       setAuthModalAction('download');
       setAuthModalOpen(true);
@@ -275,7 +275,7 @@ const ResumeGenerator: React.FC<ResumeGeneratorProps> = ({ onBack, uploadedFile,
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    toast.success('Resume downloaded!');
+    toast.success('Resume downloaded as TXT!');
   };
 
   const handleCopyResume = () => {
@@ -454,7 +454,7 @@ We are looking for a Senior Software Engineer with 3+ years of experience in Rea
               onSave={handleSaveResume}
               onCancel={handleCancelEdit}
               onDownloadPDF={handleDownloadPDF}
-              onDownloadDOCX={handleDownloadDOCX}
+              onDownloadTXT={handleDownloadTXT}
               onCopy={handleCopyResume}
               isAuthenticated={isAuthenticated}
             />

@@ -1,12 +1,29 @@
-
 import React, { useCallback, useState } from 'react';
 import { Upload, FileText, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 
 interface FileUploadProps {
   onFileSelect: (file: File) => void;
   isLoading?: boolean;
 }
+
+const ACCEPTED_TYPES = [
+  'application/pdf',
+  'text/plain',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/msword'
+];
+
+const ACCEPTED_EXTENSIONS = ['.pdf', '.txt', '.docx', '.doc'];
+
+const isValidFile = (file: File): boolean => {
+  const hasValidType = ACCEPTED_TYPES.includes(file.type);
+  const hasValidExtension = ACCEPTED_EXTENSIONS.some(ext => 
+    file.name.toLowerCase().endsWith(ext)
+  );
+  return hasValidType || hasValidExtension;
+};
 
 const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect, isLoading = false }) => {
   const [isDragOver, setIsDragOver] = useState(false);
@@ -29,15 +46,21 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect, isLoading = false
     const files = Array.from(e.dataTransfer.files);
     const file = files[0];
     
-    if (file && (file.type === 'application/pdf' || file.name.endsWith('.pdf'))) {
+    if (file && isValidFile(file)) {
       setSelectedFile(file);
+    } else if (file) {
+      toast.error('Please upload a PDF, DOCX, or TXT file');
     }
   }, []);
 
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setSelectedFile(file);
+      if (isValidFile(file)) {
+        setSelectedFile(file);
+      } else {
+        toast.error('Please upload a PDF, DOCX, or TXT file');
+      }
     }
   }, []);
 
@@ -109,7 +132,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect, isLoading = false
             Drop your resume here
           </p>
           <p className="text-xs text-muted-foreground">
-            or click to browse • PDF only
+            or click to browse • PDF, DOCX, or TXT
           </p>
         </div>
       </div>
@@ -117,7 +140,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect, isLoading = false
       <input
         id="file-upload"
         type="file"
-        accept=".pdf"
+        accept=".pdf,.docx,.doc,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,text/plain"
         onChange={handleFileChange}
         className="hidden"
       />

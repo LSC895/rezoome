@@ -10,10 +10,10 @@ verify_jwt = false
 verify_jwt = true
 
 [functions.parse-document]
-verify_jwt = true
+verify_jwt = false
 
 [functions.parse-master-cv]
-verify_jwt = true
+verify_jwt = false
 
 [functions.sync-clerk-user]
 verify_jwt = false
