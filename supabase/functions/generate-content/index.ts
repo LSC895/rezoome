@@ -235,7 +235,7 @@ Generate the resume NOW. Output ONLY the resume text following the exact format 
     const startTime = Date.now();
 
     const geminiResponse = await callGeminiWithRetry(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${geminiApiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`,
       {
         contents: [{
           parts: [{ text: systemPrompt }]
@@ -300,7 +300,7 @@ Recent Experience: ${JSON.stringify(masterCVData.work_experience?.slice(0, 2) ||
 Output ONLY the cover letter text:`;
 
       const coverLetterResponse = await callGeminiWithRetry(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${geminiApiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`,
         {
           contents: [{
             parts: [{ text: coverLetterPrompt }]
