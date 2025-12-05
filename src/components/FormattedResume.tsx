@@ -25,7 +25,7 @@ interface FormattedResumeProps {
   onSave: (content: string) => void;
   onCancel: () => void;
   onDownloadPDF: () => void;
-  onDownloadDOCX: () => void;
+  onDownloadTXT: () => void;
   onCopy?: () => void;
   isAuthenticated?: boolean;
 }
@@ -39,7 +39,7 @@ export const FormattedResume: React.FC<FormattedResumeProps> = ({
   onSave,
   onCancel,
   onDownloadPDF,
-  onDownloadDOCX,
+  onDownloadTXT,
   onCopy,
   isAuthenticated = true
 }) => {
@@ -221,12 +221,12 @@ export const FormattedResume: React.FC<FormattedResumeProps> = ({
             {isAuthenticated ? 'Download PDF' : 'Sign in to Download'}
           </Button>
           <Button
-            onClick={onDownloadDOCX}
+            onClick={onDownloadTXT}
             variant="outline"
             size="sm"
           >
             <Download className="mr-2 h-4 w-4" />
-            DOCX
+            TXT
           </Button>
         </div>
       </div>
