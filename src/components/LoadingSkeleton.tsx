@@ -3,11 +3,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Wand2 } from 'lucide-react';
 
 interface LoadingSkeletonProps {
-  progress: number;
-  status: string;
+  progress?: number;
+  status?: string;
 }
 
-const LoadingSkeleton: React.FC<LoadingSkeletonProps> = ({ progress, status }) => {
+const LoadingSkeleton: React.FC<LoadingSkeletonProps> = ({ progress = 50, status = 'Processing...' }) => {
   return (
     <div className="floating-card p-8 max-w-4xl mx-auto animate-scale-in">
       <div className="text-center mb-8">

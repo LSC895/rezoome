@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import Index from "./pages/Index";
+import Roast from "./pages/Roast";
 import Home from "./pages/Home";
 import Pricing from "./pages/Pricing";
 import ExtensionAuth from "./pages/ExtensionAuth";
@@ -23,6 +24,7 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
+            <Route path="/roast" element={<Roast />} />
             <Route path="/home" element={<Home />} />
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/extension-auth" element={<ExtensionAuth />} />
