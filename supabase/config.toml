@@ -7,7 +7,7 @@ verify_jwt = true
 verify_jwt = false
 
 [functions.analyze-resume]
-verify_jwt = true
+verify_jwt = false
 
 [functions.parse-document]
 verify_jwt = false
@@ -16,4 +16,10 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.sync-clerk-user]
+verify_jwt = false
+
+[functions.roast-resume]
+verify_jwt = false
+
+[functions.generate-fix]
 verify_jwt = false
