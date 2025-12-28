@@ -1,4 +1,4 @@
-import { RoastResponseSchema } from '../src/server/roast/validation';
+import { RoastResponseSchema } from '../frontend/src/server/roast/validation';
 
 const BASE = process.env.TEST_BASE_URL ?? 'http://localhost:8787';
 
